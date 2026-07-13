@@ -689,23 +689,28 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const table = document.createElement('table');
     table.className = 'wafer-table';
     table.innerHTML = '<thead><tr>'+
-      '<th>Wafer</th><th>AOI標記</th><th>Overkill</th><th>Confirmed(真缺陷)</th><th>CP_Pass</th><th>CP_Fail</th>'+
+      '<th>Wafer</th><th>AOI標記</th><th>Overkill</th><th>Confirmed(真缺陷)</th><th>Confirmed_Die_XY(CP_XAdr/YAdr)</th><th>CP_Pass</th><th>CP_Fail</th>'+
       '</tr></thead>';
     const tbody = document.createElement('tbody');
 
     for(const [wid, w] of wafers){
       const tr = document.createElement('tr');
       if(!w.result){
-        tr.innerHTML = '<td>'+esc(wid)+'</td><td colspan="5" class="warn">⚠ 找不到對應 CP 檔案</td>';
+        tr.innerHTML = '<td>'+esc(wid)+'</td><td colspan="6" class="warn">⚠ 找不到對應 CP 檔案</td>';
         tbody.appendChild(tr);
         continue;
       }
       const r = w.result, cp = w.cp;
+      const confirmedXY = r.details
+        .filter(d=>d.status==='confirmed')
+        .map(d=>'('+d.cpX+'/'+d.cpY+')')
+        .join(';');
       tr.innerHTML =
         '<td>'+esc(wid)+(r.unmatched? '<span class="badge-unmatched">'+r.unmatched+' 未匹配</span>':'')+'</td>'+
         '<td>'+r.marks+'</td>'+
         '<td class="ok-count">'+r.overkill+'</td>'+
         '<td class="conf-count">'+r.confirmed+'</td>'+
+        '<td style="font-family:var(--mono); font-size:11px; max-width:260px; word-break:break-word;">'+(confirmedXY?esc(confirmedXY):'—')+'</td>'+
         '<td>'+cp.passCount+'</td>'+
         '<td>'+cp.failCount+'</td>';
       tr.addEventListener('click', ()=> toggleDetail(tr, w, wid));
@@ -735,7 +740,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const detailRow = document.createElement('tr');
     detailRow.className = 'detail-row';
     const td = document.createElement('td');
-    td.colSpan = 6;
+    td.colSpan = 7;
     td.appendChild(buildWaferDetail(w, wid));
     detailRow.appendChild(td);
     tr.parentNode.insertBefore(detailRow, tr.nextSibling);
@@ -818,12 +823,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   // ---------- export ----------
   document.getElementById('btn-export').addEventListener('click', ()=>{
     if(!lastResult) return;
-    let csv = 'Lot,Wafer,AOI標記,Overkill,Confirmed,CP_Pass,CP_Fail,未匹配,Confirmed_Die_XY(CP_XAdr/YAdr)\n';
+    let csv = 'Lot,Wafer,AOI標記,Overkill,Confirmed,Confirmed_Die_XY(CP_XAdr/YAdr),CP_Pass,CP_Fail,未匹配\n';
     for(const [lotName, lotObj] of lastResult.lots){
       const wafers = [...lotObj.wafers.entries()].sort((a,b)=> a[0].localeCompare(b[0], undefined, {numeric:true}));
       for(const [wid, w] of wafers){
         if(!w.result){
-          csv += [lotName, wid, '', '', '', '', '', 'NO_CP', ''].join(',')+'\n';
+          csv += [lotName, wid, '', '', '', '', '', '', 'NO_CP'].join(',')+'\n';
           continue;
         }
         // Confirmed = AOI 判定異常 且 CP 該座標也是 fail（bin!==1）的 die，取 CP 的 XAdr/YAdr
@@ -831,7 +836,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           .filter(d=>d.status==='confirmed')
           .map(d=>'('+d.cpX+'/'+d.cpY+')')
           .join(';');
-        csv += [lotName, wid, w.result.marks, w.result.overkill, w.result.confirmed, w.cp.passCount, w.cp.failCount, w.result.unmatched, confirmedXY].join(',')+'\n';
+        csv += [lotName, wid, w.result.marks, w.result.overkill, w.result.confirmed, confirmedXY, w.cp.passCount, w.cp.failCount, w.result.unmatched].join(',')+'\n';
       }
     }
     const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
