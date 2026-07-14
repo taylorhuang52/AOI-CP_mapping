@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOI–CP 自動對應分析報表 · 原理與使用說明</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+TC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12151A;
+    --bg-raised:#1A1E26;
+    --surface:#1E232C;
+    --surface-2:#242A34;
+    --line:#2B3140;
+    --line-soft:#22262F;
+    --text:#E7EAEF;
+    --text-dim:#9AA3B2;
+    --text-faint:#5F6675;
+    --accent-cyan:#5AC8E0;
+    --accent-cyan-dim:#2E4650;
+    --green:#3FA34D;
+    --green-bg:#16241A;
+    --yellow:#F2C230;
+    --yellow-bg:#2A230F;
+    --red:#D6413B;
+    --red-bg:#2A1614;
+    --mono:'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:'IBM Plex Sans','IBM Plex Sans TC', -apple-system, 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans); line-height:1.7; font-size:15.5px;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--accent-cyan-dim); color:#fff; }
+
+  /* faint die-grid texture on the page background */
+  body::before{
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size: 34px 34px;
+    opacity:0.35;
+    mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, black, transparent 75%);
+  }
+
+  .wrap{ position:relative; z-index:1; max-width:920px; margin:0 auto; padding:0 24px 120px; }
+
+  /* ---------- top nav ---------- */
+  nav.topnav{
+    position:sticky; top:0; z-index:20;
+    backdrop-filter:blur(10px);
+    background:rgba(18,21,26,0.86);
+    border-bottom:1px solid var(--line);
+  }
+  .topnav-inner{
+    max-width:920px; margin:0 auto; padding:0 24px;
+    display:flex; align-items:center; gap:22px; height:52px;
+    overflow-x:auto;
+  }
+  .topnav-brand{
+    font-family:var(--mono); font-size:12.5px; color:var(--text-dim);
+    white-space:nowrap; letter-spacing:0.02em;
+  }
+  .topnav-brand b{ color:var(--accent-cyan); font-weight:600; }
+  .topnav-links{ display:flex; gap:18px; white-space:nowrap; }
+  .topnav-links a{
+    color:var(--text-dim); text-decoration:none; font-size:13px;
+    padding:6px 0; border-bottom:2px solid transparent;
+  }
+  .topnav-links a:hover{ color:var(--text); border-bottom-color:var(--accent-cyan); }
+
+  /* ---------- hero ---------- */
+  header.hero{ padding:64px 0 40px; }
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; color:var(--accent-cyan);
+    letter-spacing:0.14em; text-transform:uppercase; margin-bottom:14px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{ content:''; width:16px; height:1px; background:var(--accent-cyan); display:inline-block; }
+  h1.title{
+    font-size:clamp(28px,4.4vw,42px); line-height:1.18; margin:0 0 16px;
+    font-weight:700; letter-spacing:-0.01em;
+  }
+  .lede{ color:var(--text-dim); font-size:16.5px; max-width:64ch; margin:0 0 8px; }
+  .formula-chip{
+    display:inline-flex; align-items:center; gap:10px; margin-top:22px;
+    font-family:var(--mono); font-size:13px; color:var(--text);
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    padding:10px 16px;
+  }
+  .formula-chip .eq{ color:var(--accent-cyan); }
+
+  /* ---------- interactive demo ---------- */
+  .demo{
+    margin-top:36px; background:var(--surface); border:1px solid var(--line);
+    border-radius:14px; overflow:hidden;
+  }
+  .demo-head{
+    padding:16px 20px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  }
+  .demo-head h3{ margin:0; font-size:14px; font-weight:600; color:var(--text); }
+  .demo-head span{ font-family:var(--mono); font-size:11.5px; color:var(--text-faint); }
+  .demo-body{ display:grid; grid-template-columns:1fr; gap:0; }
+  @media(min-width:640px){ .demo-body{ grid-template-columns: 1.15fr 1fr; } }
+  .demo-canvas{ padding:22px; display:flex; align-items:center; justify-content:center; background:var(--bg-raised); }
+  .demo-controls{ padding:20px 22px; border-top:1px solid var(--line); }
+  @media(min-width:640px){ .demo-controls{ border-top:none; border-left:1px solid var(--line); } }
+  .ctrl-row{ margin-bottom:16px; }
+  .ctrl-row:last-child{ margin-bottom:0; }
+  .ctrl-label{
+    display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-dim);
+    margin-bottom:6px; font-family:var(--mono);
+  }
+  .ctrl-label b{ color:var(--text); font-weight:600; }
+  input[type=range]{
+    width:100%; accent-color:var(--accent-cyan); height:4px; cursor:pointer;
+  }
+  .check-row{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); margin-bottom:10px; }
+  .check-row input{ accent-color:var(--accent-cyan); width:15px; height:15px; }
+  .demo-readout{
+    margin-top:16px; padding-top:14px; border-top:1px dashed var(--line);
+    font-family:var(--mono); font-size:12.5px; color:var(--text-dim); line-height:1.9;
+  }
+  .demo-readout b{ color:var(--accent-cyan); }
+  .legend-mini{ display:flex; gap:14px; margin-top:14px; flex-wrap:wrap; }
+  .legend-mini span{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-dim); }
+  .legend-mini i{ width:9px; height:9px; border-radius:2px; display:inline-block; }
+
+  /* ---------- sections ---------- */
+  section{ margin-top:76px; scroll-margin-top:72px; }
+  .section-head{ display:flex; align-items:baseline; gap:14px; margin-bottom:22px; }
+  .section-num{ font-family:var(--mono); font-size:13px; color:var(--accent-cyan); }
+  h2{ font-size:22px; margin:0; font-weight:700; letter-spacing:-0.005em; }
+  h3{ font-size:16px; margin:28px 0 10px; font-weight:600; color:var(--text); }
+  p{ color:var(--text-dim); margin:0 0 14px; }
+  p.tight{ margin-bottom:6px; }
+  .section-intro{ color:var(--text-dim); max-width:70ch; margin-bottom:26px; }
+
+  code, .mono{ font-family:var(--mono); }
+  code{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:4px;
+    padding:1.5px 6px; font-size:0.88em; color:var(--accent-cyan);
+  }
+
+  /* card / panel */
+  .panel{
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    padding:22px 24px; margin:18px 0;
+  }
+  .panel-title{ font-size:13px; font-weight:600; color:var(--text); margin-bottom:10px; display:flex; align-items:center; gap:8px;}
+  .panel-title .dot{ width:6px; height:6px; border-radius:50%; background:var(--accent-cyan); }
+
+  /* data format comparison table */
+  .fmt-grid{ display:grid; grid-template-columns:1fr; gap:16px; }
+  @media(min-width:640px){ .fmt-grid{ grid-template-columns:1fr 1fr; } }
+  .fmt-card{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px; }
+  .fmt-card h4{ margin:0 0 4px; font-size:14px; }
+  .fmt-card .fmt-sub{ font-size:12px; color:var(--text-faint); margin-bottom:14px; }
+  .fmt-card pre{
+    margin:0; background:var(--bg-raised); border:1px solid var(--line-soft); border-radius:8px;
+    padding:14px; font-family:var(--mono); font-size:11.5px; color:var(--text-dim);
+    overflow-x:auto; line-height:1.75;
+  }
+  .fmt-card pre .k{ color:var(--accent-cyan); }
+  .fmt-card pre .v{ color:var(--text); }
+
+  /* pipeline steps */
+  .pipeline{ border-left:1px solid var(--line); padding-left:26px; margin:24px 0; }
+  .pstep{ position:relative; padding-bottom:26px; }
+  .pstep:last-child{ padding-bottom:0; }
+  .pstep::before{
+    content: attr(data-n); position:absolute; left:-37px; top:0;
+    width:22px; height:22px; border-radius:50%; background:var(--surface-2);
+    border:1px solid var(--accent-cyan); color:var(--accent-cyan);
+    font-family:var(--mono); font-size:11px; display:flex; align-items:center; justify-content:center;
+  }
+  .pstep h4{ margin:0 0 6px; font-size:14.5px; color:var(--text); font-weight:600; }
+  .pstep p{ margin:0; font-size:14px; }
+
+  /* color legend */
+  .legend-grid{ display:grid; grid-template-columns:1fr; gap:12px; margin:22px 0; }
+  @media(min-width:640px){ .legend-grid{ grid-template-columns:repeat(3,1fr); } }
+  .legend-card{ border-radius:12px; padding:18px 18px 16px; border:1px solid var(--line); }
+  .legend-card.green{ background:var(--green-bg); border-color:#2B4A31; }
+  .legend-card.yellow{ background:var(--yellow-bg); border-color:#4A3B18; }
+  .legend-card.red{ background:var(--red-bg); border-color:#4A2320; }
+  .legend-card .sw{ width:22px; height:22px; border-radius:5px; margin-bottom:12px; }
+  .legend-card.green .sw{ background:var(--green); }
+  .legend-card.yellow .sw{ background:var(--yellow); }
+  .legend-card.red .sw{ background:var(--red); }
+  .legend-card h4{ margin:0 0 6px; font-size:14px; color:var(--text); }
+  .legend-card p{ margin:0; font-size:12.8px; color:var(--text-dim); }
+
+  /* usage steps (numbered, real sequence) */
+  .usage-list{ counter-reset:step; margin:22px 0; }
+  .usage-item{
+    counter-increment:step; display:grid; grid-template-columns:44px 1fr; gap:18px;
+    padding:18px 0; border-top:1px solid var(--line-soft);
+  }
+  .usage-item:first-child{ border-top:none; }
+  .usage-item::before{
+    content:counter(step,decimal-leading-zero); font-family:var(--mono); font-size:13px;
+    color:var(--accent-cyan); padding-top:2px; grid-column:1; grid-row:1 / -1;
+  }
+  .usage-item h4{ margin:0 0 5px; font-size:15px; color:var(--text); grid-column:2; }
+  .usage-item p{ margin:0; font-size:13.8px; grid-column:2; }
+  .tag{
+    display:inline-block; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+    background:var(--surface-2); border:1px solid var(--line); border-radius:4px;
+    padding:1px 7px; margin-left:8px; vertical-align:1px;
+  }
+
+  /* troubleshoot */
+  .trouble{ border:1px solid var(--line); border-radius:12px; margin:16px 0; overflow:hidden; }
+  .trouble-head{
+    padding:16px 20px; background:var(--surface); display:flex; align-items:center; gap:10px;
+    border-left:3px solid var(--red);
+  }
+  .trouble-head b{ font-size:14px; color:var(--text); }
+  .trouble-body{ padding:18px 20px; background:var(--bg-raised); font-size:13.8px; }
+  .trouble-body p{ margin:0 0 10px; }
+  .trouble-body p:last-child{ margin-bottom:0; }
+  .case-log{
+    font-family:var(--mono); font-size:12px; background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; padding:12px 14px; margin:10px 0; color:var(--text-dim); line-height:1.85;
+  }
+  .case-log .bad{ color:var(--red); }
+  .case-log .ok{ color:var(--green); }
+
+  footer{
+    margin-top:90px; padding-top:26px; border-top:1px solid var(--line);
+    color:var(--text-faint); font-size:12px; font-family:var(--mono);
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  }
+
+  @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <span class="topnav-brand">AOI<span style="color:var(--text-faint)">–</span><b>CP</b> 分析報表 · 說明文件</span>
+    <div class="topnav-links">
+      <a href="#principle">比對原理</a>
+      <a href="#format">資料格式</a>
+      <a href="#colors">顏色判讀</a>
+      <a href="#usage">使用步驟</a>
+      <a href="#extra">附加功能</a>
+      <a href="#trouble">疑難排解</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">工具說明文件</div>
+    <h1 class="title">AOI 標記怎麼知道<br>是不是真缺陷？</h1>
+    <p class="lede">
+      「AOI–CP 自動對應分析報表」把 AOI 外觀檢測標記出的每一顆 die，對照到 CP 電性測試的同一顆 die，
+      自動判斷這個標記究竟是<b style="color:var(--text)">真缺陷</b>，還是 AOI 誤殺的<b style="color:var(--text)">Overkill</b>。
+      下面用這批工具實際處理過的資料，說明它的比對邏輯與操作方式。
+    </p>
+    <div class="formula-chip">
+      <span class="eq">CP_XAdr = AOI_XINDEX + Xoff</span>
+      <span style="color:var(--text-faint)">·</span>
+      <span class="eq">CP_YAdr = AOI_YINDEX + Yoff</span>
+    </div>
+
+    <!-- interactive calibration demo -->
+    <div class="demo">
+      <div class="demo-head">
+        <h3>座標校正示範</h3>
+        <span>拖動下方數值，觀察 AOI 網格如何對齊到 CP 網格</span>
+      </div>
+      <div class="demo-body">
+        <div class="demo-canvas">
+          <svg id="demoSvg" viewBox="0 0 280 280" width="260" height="260"></svg>
+        </div>
+        <div class="demo-controls">
+          <div class="ctrl-row">
+            <div class="ctrl-label"><span>X 位移量 Xoff</span><b id="lblOffX">6</b></div>
+            <input type="range" id="offX" min="-8" max="8" value="6">
+          </div>
+          <div class="ctrl-row">
+            <div class="ctrl-label"><span>Y 位移量 Yoff</span><b id="lblOffY">7</b></div>
+            <input type="range" id="offY" min="-8" max="8" value="7">
+          </div>
+          <div class="check-row"><input type="checkbox" id="flipX"><label for="flipX">X 軸反向</label></div>
+          <div class="check-row"><input type="checkbox" id="flipY"><label for="flipY">Y 軸反向（AOI 第一列 = wafer 頂端）</label></div>
+          <div class="demo-readout" id="readout"></div>
+          <div class="legend-mini">
+            <span><i style="background:var(--surface-2);border:1px solid var(--text-faint)"></i>AOI 標記格</span>
+            <span><i style="background:var(--accent-cyan)"></i>換算後對到的 CP 座標</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= 比對原理 ================= -->
+  <section id="principle">
+    <div class="section-head"><span class="section-num">01</span><h2>比對原理</h2></div>
+    <p class="section-intro">
+      AOI 和 CP 是兩套完全獨立的系統，各自用自己的座標系統記錄同一片 wafer。
+      報表要做的事，就是把兩套座標「對上」，再逐顆比對結果。整體分成四個步驟：
+    </p>
+
+    <div class="pipeline">
+      <div class="pstep" data-n="1">
+        <h4>解析 AOI 標記檔</h4>
+        <p>讀取每片 wafer 的 <code>RowData</code> 網格，把不是 <code>___</code>（wafer 外）、不是 <code>000</code>（正常）的座標記為一筆「AOI 標記」，並記下它的 code 值與 (X, Y) 位置。</p>
+      </div>
+      <div class="pstep" data-n="2">
+        <h4>解析 CP 測試檔</h4>
+        <p>讀取 <code>Serial#,Site#,Bin#,SBin#,XAdr,YAdr</code> 資料表，建立一張「座標 → Bin 值」的對照表（<code>dieMap</code>）。<code>Bin=1</code> 視為 Pass，其餘視為 Fail。</p>
+      </div>
+      <div class="pstep" data-n="3">
+        <h4>座標換算</h4>
+        <p>因為兩套系統的原點、掃描方向不一定相同，AOI 的座標要先套用「軸反向」設定，再加上 X/Y 位移量，才能換算成 CP 座標：<code>CP_XAdr = AOI_X ± Xoff</code>、<code>CP_YAdr = AOI_Y ± Yoff</code>。</p>
+      </div>
+      <div class="pstep" data-n="4">
+        <h4>逐點比對、分類</h4>
+        <p>用換算出的座標去查 CP 的 <code>dieMap</code>：查不到 → <b style="color:var(--text)">未匹配</b>；查到且 Bin=1（Pass）→ <b style="color:var(--yellow)">Overkill Suspected</b>；查到且 Bin≠1（Fail）→ <b style="color:var(--red)">Confirmed 真缺陷</b>。</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><span class="dot"></span>wafer 怎麼配對到同一批（Lot）</div>
+      <p style="margin:0;">
+        每片 AOI 檔用檔案內容裡的 <code>WAFER:</code> 欄位當 key，每片 CP 檔用內容裡的 <code>Wafer ID</code> 欄位當 key，
+        兩邊字串<b style="color:var(--text)">必須完全相同</b>才會配對成功（例如都要是 <code>RP69778-01</code>）。
+        報表比對的是<b style="color:var(--text)">檔案內容裡寫的 ID</b>，不是壓縮檔或檔名本身——這點是後面「疑難排解」最常見的誤解來源。
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= 資料格式 ================= -->
+  <section id="format">
+    <div class="section-head"><span class="section-num">02</span><h2>兩邊分別讀什麼欄位</h2></div>
+    <p class="section-intro">上傳的每個 .csv，報表只認特定的標頭與欄位，其餘內容會被忽略。</p>
+
+    <div class="fmt-grid">
+      <div class="fmt-card">
+        <h4>AOI 標記檔</h4>
+        <div class="fmt-sub">每片 wafer 一個 .csv，例：RP69778-01.csv</div>
+        <pre><span class="k">LOT:</span><span class="v">RP69778</span>
+<span class="k">WAFER:</span><span class="v">RP69778-01</span>
+<span class="k">ROWCT:</span><span class="v">26</span>
+<span class="k">COLCT:</span><span class="v">28</span>
+<span class="k">RowData:</span><span class="v">___ ___ 000 000 ...</span>
+<span class="k">RowData:</span><span class="v">___ 000 000 X01 ...</span></pre>
+      </div>
+      <div class="fmt-card">
+        <h4>CP 測試檔</h4>
+        <div class="fmt-sub">每片 wafer 一個 .csv，例：RP69778-01…dlogTDO.csv</div>
+        <pre><span class="k">Lot ID</span>    : <span class="v">RP69778</span>
+<span class="k">Wafer ID</span>  : <span class="v">RP69778-01</span>
+Serial#,Site#,<span class="k">Bin#</span>,SBin#,<span class="k">XAdr</span>,<span class="k">YAdr</span>
+0,5,<span class="v">1</span>,1,<span class="v">13</span>,<span class="v">8</span>
+1,6,<span class="v">1</span>,1,<span class="v">14</span>,<span class="v">8</span></pre>
+      </div>
+    </div>
+    <p style="font-size:13px;">
+      兩邊都支援 <code>.zip</code>（內含各片 wafer 的 .csv，可含子資料夾）或個別 <code>.csv</code>，同一批可分多次上傳，系統會依 Wafer ID 自動彙整。
+    </p>
+  </section>
+
+  <!-- ================= 顏色判讀 ================= -->
+  <section id="colors">
+    <div class="section-head"><span class="section-num">03</span><h2>Wafer Map 三色怎麼看</h2></div>
+    <p class="section-intro">「所有 WAFER MAP 總覽」裡，每片 wafer 的每一顆 AOI 標記 die 會依比對結果著色：</p>
+
+    <div class="legend-grid">
+      <div class="legend-card yellow">
+        <div class="sw"></div>
+        <h4>黃 · Overkill Suspected</h4>
+        <p>AOI Fail，但 CP 該座標是 Pass（Bin=1）。代表 AOI 很可能誤判，這顆 die 電性其實正常。</p>
+      </div>
+      <div class="legend-card red">
+        <div class="sw"></div>
+        <h4>紅 · Confirmed</h4>
+        <p>AOI Fail，CP 該座標也是 Fail（含查不到座標的「未匹配」）。代表 AOI 標記的很可能是真缺陷。</p>
+      </div>
+      <div class="legend-card green">
+        <div class="sw"></div>
+        <h4>綠 · 其餘 die</h4>
+        <p>wafer 上沒被 AOI 標記異常的其他 die，僅作為底圖參考，不計入統計。</p>
+      </div>
+    </div>
+    <p style="font-size:13px;">
+      上方彙總表中的 <b style="color:var(--text)">Overkill Suspected 率</b> = 黃色顆數 ÷（黃色＋紅色）顆數，用來評估這批 AOI 設定的誤殺比例。
+    </p>
+  </section>
+
+  <!-- ================= 使用步驟 ================= -->
+  <section id="usage">
+    <div class="section-head"><span class="section-num">04</span><h2>操作步驟</h2></div>
+    <p class="section-intro">實際操作時，畫面由上到下依序對應以下步驟：</p>
+
+    <div class="usage-list">
+      <div class="usage-item">
+        <h4>上傳 AOI 與 CP 檔案<span class="tag">Step 1</span></h4>
+        <p>左邊丟 AOI 的 .zip 或 .csv，右邊丟 CP 的 .zip 或 .csv。可以分批、分次上傳同一批 Lot 的不同 wafer，系統會累積在清單裡。</p>
+      </div>
+      <div class="usage-item">
+        <h4>展開「進階座標校正設定」<span class="tag">選填</span></h4>
+        <p>預設 <code>Xoff=6、Yoff=7</code>，若比對後「未匹配」數量偏高，回來調整位移量或勾選 X／Y 軸反向，重新分析。</p>
+      </div>
+      <div class="usage-item">
+        <h4>點「分析並產生報表」</h4>
+        <p>系統會依 Wafer ID 把 AOI 與 CP 逐片配對、套用座標換算、計算三色分類，並依 Lot 分組顯示。</p>
+      </div>
+      <div class="usage-item">
+        <h4>閱讀彙總表格與總覽 Wafer Map</h4>
+        <p>每個 Lot 區塊上方是總 AOI 標記數 / Overkill / Confirmed 統計，下方表格列出每片 wafer 的細節；再往下是所有 wafer 的縮圖總覽，方便一次掃過整批。</p>
+      </div>
+      <div class="usage-item">
+        <h4>「匯出彙總 CSV」<span class="tag">選填</span></h4>
+        <p>把目前的比對結果（含每片 wafer 的統計與 Confirmed die 座標）匯出成 CSV，方便存檔或帶去別的系統。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 附加功能 ================= -->
+  <section id="extra">
+    <div class="section-head"><span class="section-num">05</span><h2>附加功能：AOI 影像 ↔ Wafer Map 位置對應</h2></div>
+    <p class="section-intro">
+      主報表只看數字座標；如果要回頭確認「某顆標記 die 的 AOI 影像長什麼樣子」，可以用頁面下方這個獨立功能：
+    </p>
+    <div class="panel">
+      <p style="margin-bottom:10px;">
+        上傳<b style="color:var(--text)">完整的 AOI zip</b>（每片 wafer 子資料夾內同時有 .csv 網格檔與多張 <code>X_Y_Z.jpg</code> 影像）。
+        系統會從檔名解析出 X、Y（座標）與 Z（同一顆 die 上第幾筆缺陷紀錄），自動把每張影像標註回 wafer 網格圖上對應的位置。
+      </p>
+      <p style="margin:0;">
+        在主報表的總覽圖點某片 wafer 的編號，會自動捲動並跳到這裡對應的影像位置圖；同一座標有多張影像時，圖上僅顯示一個 Z 值，其餘可在對照表或匯出的 xlsx 中查看。
+      </p>
+    </div>
+  </section>
+
+  <!-- ================= 疑難排解 ================= -->
+  <section id="trouble">
+    <div class="section-head"><span class="section-num">06</span><h2>疑難排解</h2></div>
+    <p class="section-intro">幾個常見狀況與排查方向：</p>
+
+    <div class="trouble">
+      <div class="trouble-head">⚠ <b>「找不到對應 CP 檔的 wafer」— 整批都對不上</b></div>
+      <div class="trouble-body">
+        <p>先確認 AOI 與 CP 檔案內容裡的 Lot／Wafer ID 是否<b style="color:var(--text)">逐字相同</b>——報表比的是檔案內容，不是檔名或壓縮檔名。實際案例：</p>
+        <div class="case-log">
+AOI 內容　WAFER: <span class="bad">RP69778</span>-01
+CP  內容　Wafer ID: <span class="bad">RP69678</span>-01   ← 第4碼不同，比對永遠失敗
+        </div>
+        <p>這通常是某一邊系統的操作員在登錄 Lot 號碼時打錯（多半是 CP 測試站台的 ATE 系統人工輸入），不是報表程式的 bug。
+        排查方式：跟 MES／測試站台日誌核對正確 Lot 號碼，確認同一批後，把打錯那邊的 Lot ID／Wafer ID 欄位改正再重新匯入。</p>
+      </div>
+    </div>
+
+    <div class="trouble">
+      <div class="trouble-head">⚠ <b>「未匹配」數量偏高</b></div>
+      <div class="trouble-body">
+        <p>Wafer 有配對成功，但很多 AOI 標記換算後的座標在 CP 資料裡查不到，代表座標系統沒對齊。</p>
+        <p style="margin:0;">回到「進階座標校正設定」，嘗試調整 <code>Xoff / Yoff</code>，或勾選 X／Y 軸反向後重新分析，觀察未匹配數量是否下降。</p>
+      </div>
+    </div>
+
+    <div class="trouble">
+      <div class="trouble-head">⚠ <b>zip 上傳後沒有任何檔案出現</b></div>
+      <div class="trouble-body">
+        <p style="margin:0;">確認 zip 裡是 <code>.csv</code>（而非 .kla、.klaExt 等其他格式），且檔案未被額外壓縮成巢狀 zip；macOS 打包產生的 <code>__MACOSX</code> 目錄會自動被忽略，不影響解析。</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>AOI–CP 自動對應分析報表 · 說明文件</span>
+    <span>整理自報表原始邏輯（parseAOI / parseCP / matchWafer）</span>
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById('demoSvg');
+  const offXInput = document.getElementById('offX');
+  const offYInput = document.getElementById('offY');
+  const flipXInput = document.getElementById('flipX');
+  const flipYInput = document.getElementById('flipY');
+  const lblOffX = document.getElementById('lblOffX');
+  const lblOffY = document.getElementById('lblOffY');
+  const readout = document.getElementById('readout');
+
+  const N = 10;       // grid size for the demo
+  const cell = 20;
+  const gap = 2;
+  const gridPx = N*(cell+gap);
+  const originAOI = { x: 14, y: 14 };
+  const originCP = { x: 14 + gridPx + 26, y: 14 };
+  const markX = 2, markY = 3; // fixed sample AOI mark position
+
+  function render(){
+    const offX = parseInt(offXInput.value,10);
+    const offY = parseInt(offYInput.value,10);
+    const flipX = flipXInput.checked;
+    const flipY = flipYInput.checked;
+    lblOffX.textContent = offX;
+    lblOffY.textContent = offY;
+
+    let xx = flipX ? (N-1-markX) : markX;
+    let yy = flipY ? (N-1-markY) : markY;
+    const cpX = xx + offX, cpY = yy + offY;
+    const inBounds = cpX>=0 && cpX<N && cpY>=0 && cpY<N;
+
+    let s = '';
+    // AOI grid
+    for(let i=0;i<N;i++){
+      for(let j=0;j<N;j++){
+        const isMark = (j===markX && i===markY);
+        const fill = isMark ? '#5AC8E0' : '#242A34';
+        const stroke = isMark ? '#5AC8E0' : '#2B3140';
+        s += `<rect x="${originAOI.x+j*(cell+gap)}" y="${originAOI.y+i*(cell+gap)}" width="${cell}" height="${cell}" rx="3" fill="${fill}" fill-opacity="${isMark?1:0.5}" stroke="${stroke}" stroke-width="1"/>`;
+      }
+    }
+    // CP grid
+    for(let i=0;i<N;i++){
+      for(let j=0;j<N;j++){
+        const isTarget = inBounds && j===cpX && i===cpY;
+        const fill = isTarget ? '#5AC8E0' : '#1E232C';
+        const stroke = isTarget ? '#5AC8E0' : '#2B3140';
+        s += `<rect x="${originCP.x+j*(cell+gap)}" y="${originCP.y+i*(cell+gap)}" width="${cell}" height="${cell}" rx="3" fill="${fill}" fill-opacity="${isTarget?1:0.4}" stroke="${stroke}" stroke-width="1"/>`;
+      }
+    }
+    // labels
+    s += `<text x="${originAOI.x}" y="${originAOI.y-4}" fill="#9AA3B2" font-size="9" font-family="IBM Plex Mono, monospace">AOI</text>`;
+    s += `<text x="${originCP.x}" y="${originCP.y-4}" fill="#9AA3B2" font-size="9" font-family="IBM Plex Mono, monospace">CP</text>`;
+    // arrow between marked cells if both visible
+    if(inBounds){
+      const x1 = originAOI.x + markX*(cell+gap) + cell;
+      const y1 = originAOI.y + markY*(cell+gap) + cell/2;
+      const x2 = originCP.x + cpX*(cell+gap);
+      const y2 = originCP.y + cpY*(cell+gap) + cell/2;
+      s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#5AC8E0" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>`;
+    }
+
+    svg.innerHTML = s;
+
+    readout.innerHTML =
+      `AOI 標記座標　(X=${markX}, Y=${markY})<br>`+
+      (flipX||flipY ? `套用反向後　(X=${xx}, Y=${yy})<br>` : ``) +
+      `換算 CP 座標　(X=${cpX}, Y=${cpY})<br>`+
+      (inBounds ? `→ <b>在 CP 網格範圍內，可查表比對</b>` : `→ <b style="color:#D6413B">超出網格範圍，會判為「未匹配」</b>`);
+  }
+
+  [offXInput, offYInput, flipXInput, flipYInput].forEach(el=>{
+    el.addEventListener('input', render);
+  });
+  render();
+})();
+</script>
+
+</body>
+</html>
