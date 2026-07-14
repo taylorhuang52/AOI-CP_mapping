@@ -90,7 +90,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .dropzone .dz-label .dot{width:7px; height:7px; border-radius:50%;}
   .dz-aoi .dot{background:var(--blue);}
   .dz-cp .dot{background:var(--teal);}
-  .dz-map .dot{background:var(--amber);}
   .dropzone .dz-desc{color:var(--muted); font-size:12px;}
   .dropzone input[type=file]{position:absolute; inset:0; opacity:0; cursor:pointer; pointer-events:none;}
   .filelist{list-style:none; margin:4px 0 0; padding:0; font-family:var(--mono); font-size:11.5px; max-height:120px; overflow-y:auto;}
@@ -207,8 +206,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     padding:8px; display:flex; flex-direction:column; align-items:center; gap:6px;
   }
   .wm-title{font-family:var(--mono); font-size:11px; font-weight:700; color:var(--ink);}
-  .wm-title-link{color:var(--accent, #2456C7); text-decoration:none; cursor:pointer;}
-  .wm-title-link:hover{text-decoration:underline;}
   .wm-svgwrap svg{display:block; max-width:100%; height:auto;}
   .wm-stats{display:flex; gap:6px; font-size:10.5px; font-family:var(--mono);}
   .wm-stat{padding:1px 6px; border-radius:4px; font-weight:600;}
@@ -225,8 +222,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   .die-list table{border-collapse:collapse; width:100%;}
   .die-list th,.die-list td{padding:3px 8px; text-align:left; border-bottom:1px dotted var(--line);}
   .die-list th{color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--surface);}
-  .die-list tr.row-overkill td{background:#FBF0DE;}
-  .die-list tr.row-confirmed td{background:#FBE7E5;}
   .tag{padding:1px 6px; border-radius:4px; font-size:10.5px; font-weight:600;}
   .tag.overkill{background:var(--amber-dim); color:var(--amber);}
   .tag.confirmed{background:var(--red-dim); color:var(--red);}
@@ -237,31 +232,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     padding:10px 14px; font-size:12.5px; margin-bottom:14px; line-height:1.5;
   }
   .warn-box b{font-weight:700;}
-
-  /* ---- AOI 影像檔 ↔ Wafer Map 對應（附加功能）---- */
-  #map-results{display:flex; flex-direction:column; gap:16px; margin-top:4px;}
-  .map-wafer-card{
-    background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:16px 18px;
-    scroll-margin-top:18px; transition:box-shadow .3s ease, border-color .3s ease;
-  }
-  .map-wafer-card.flash-highlight{
-    border-color:#2456C7; box-shadow:0 0 0 3px rgba(36,86,199,0.25);
-  }
-  .map-wafer-head{margin-bottom:12px;}
-  .map-wafer-head b{font-size:14px; font-family:var(--mono);}
-  .map-wafer-sub{display:block; color:var(--muted); font-size:11.5px; margin-top:3px;}
-  .map-wafer-body{display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start;}
-  .map-legend{display:flex; gap:14px; font-size:11.5px; color:var(--muted); margin-bottom:10px; flex-wrap:wrap;}
-  .map-legend span{display:inline-flex; align-items:center; gap:5px;}
-  .map-legend i{width:10px; height:10px; border-radius:2px; display:inline-block; flex-shrink:0;}
-  .map-table-details{margin-top:10px; width:100%;}
-  .map-table-details summary{
-    cursor:pointer; font-size:12px; font-weight:600; color:var(--muted); list-style:none; user-select:none;
-  }
-  .map-table-details summary::-webkit-details-marker{display:none;}
-  .map-table-details summary:before{content:'▸ '; font-size:10px;}
-  .map-table-details[open] summary:before{content:'▾ ';}
-  .map-table-details .die-list{margin-top:8px; max-height:260px; min-width:0;}
 
   footer.note{
     text-align:center; color:var(--muted); font-size:11.5px; margin-top:30px;
@@ -337,34 +307,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     <div class="empty">尚未匯入資料 — 請先上傳 AOI 與 CP 檔案</div>
   </div>
 
-  <section class="card">
-    <h2>附加功能 — AOI 影像檔 ↔ Wafer Map 位置對應</h2>
-    <div class="hint">
-      直接上傳<b>完整的 AOI zip 檔</b>（例：RP69675.zip，內含各片 wafer 子資料夾，每個子資料夾內同時有一份 <b>.csv</b> 網格檔與多張 <b>X_Y_Z.jpg</b> 影像檔）。
-      系統會依檔名解析出 X（XINDEX）、Y（YINDEX）、Z（wafer 內流水號），自動換算成該片 wafer 網格圖上的正確位置並標註 Z 值，讓你一眼看出每張 jpg 對應到哪一顆 die。
-      若同一個 (X, Y) 座標有多張影像（同一顆 die 上有多筆缺陷紀錄），僅擇一標註 Z（其餘 Z 值可在下方對照表中查看）。
-    </div>
-
-    <div class="dropzone dz-map" id="dz-map">
-      <div class="dz-label"><span class="dot"></span>完整 AOI zip 檔</div>
-      <div class="dz-desc">例：RP69675.zip；可一次丟入多個 zip（例如分批匯入不同 lot）</div>
-      <input type="file" id="input-map" multiple accept=".zip,application/zip">
-      <ul class="filelist" id="list-map"></ul>
-    </div>
-
-    <div class="actions">
-      <button class="primary" id="btn-map-analyze" disabled>解析並繪製對應圖</button>
-      <button class="ghost" id="btn-map-clear">清除全部</button>
-      <button class="ghost" id="btn-map-export-all" disabled>匯出 all defect_XYZ 對照表 (xlsx)</button>
-      <span class="status-msg" id="status-map-msg"></span>
-    </div>
-
-    <div id="map-results" style="margin-top:18px;">
-      <div class="empty">尚未匯入資料 — 請上傳完整 AOI zip 檔</div>
-    </div>
-  </section>
-
-  <footer class="note">座標比對邏輯：AOI 網格中第 i 列（0 為檔案第一列）／第 j 欄 → AOI_XINDEX = j，AOI_YINDEX = (總列數−1−i)（可於上方關閉反向）→ 對應 CP 之 XAdr / YAdr。影像檔名 X_Y_Z 對應網格位置：row = ROWCT−1−Y，col = X（已於上方附加功能自動換算）。</footer>
+  <footer class="note">座標比對邏輯：AOI 網格中第 i 列（0 為檔案第一列）／第 j 欄 → AOI_XINDEX = j，AOI_YINDEX = (總列數−1−i)（可於上方關閉反向）→ 對應 CP 之 XAdr / YAdr。</footer>
 </div>
 
 <script>
@@ -377,7 +320,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   let lastResult = null;
 
   // ---------- encoding-safe text decode ----------
-  function decodeBytes(bytes){
+  async function decodeFile(file){
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
     try{
       return new TextDecoder('utf-8', {fatal:true}).decode(bytes);
     }catch(e){
@@ -387,10 +332,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         return new TextDecoder('utf-8', {fatal:false}).decode(bytes);
       }
     }
-  }
-  async function decodeFile(file){
-    const buf = await file.arrayBuffer();
-    return decodeBytes(new Uint8Array(buf));
   }
 
   // ---------- parsers ----------
@@ -449,55 +390,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       }
     }
     return {lot, wafer, dieMap, passCount, failCount, headerFound: headerIdx>=0};
-  }
-
-  // ---------- .kla（KLARF）缺陷明細解析 ----------
-  function parseKLA(text){
-    const lines = text.split(/\r\n|\n/);
-    let lot=null, wafer=null;
-    const classLookup = new Map();
-    let specFields = null;
-    const defectsById = new Map();
-    let inClassLookup = false;
-    for(let i=0;i<lines.length;i++){
-      const l = lines[i].trim();
-      if(!l) continue;
-      if(lot===null){ const m=l.match(/^LotID\s+"([^"]*)"/); if(m) lot=m[1]; }
-      if(wafer===null){ const m=l.match(/^WaferID\s+"([^"]*)"/); if(m) wafer=m[1]; }
-      if(/^ClassLookup\s+\d+/.test(l)){ inClassLookup = true; continue; }
-      if(inClassLookup){
-        const m = l.match(/^(\d+)\s+"([^"]*)"\s*;?$/);
-        if(m){
-          classLookup.set(parseInt(m[1],10), m[2]);
-          if(/;\s*$/.test(l)) inClassLookup = false;
-          continue;
-        } else {
-          inClassLookup = false;
-        }
-      }
-      if(/^DefectRecordSpec\s+\d+/.test(l)){
-        const m = l.match(/^DefectRecordSpec\s+\d+\s+(.+?);?\s*$/);
-        if(m) specFields = m[1].trim().replace(/;$/,'').split(/\s+/);
-        continue;
-      }
-      if(l === 'DefectList'){
-        let j=i+1;
-        while(j<lines.length && !lines[j].trim()) j++;
-        if(j<lines.length && specFields){
-          const dataLine = lines[j].trim().replace(/;\s*$/,'');
-          const tokens = dataLine.split(/\s+/);
-          const rec = {};
-          for(let k=0;k<specFields.length-1 && k<tokens.length;k++){
-            rec[specFields[k]] = tokens[k];
-          }
-          const id = parseInt(rec.DEFECTID,10);
-          if(!Number.isNaN(id)) defectsById.set(id, rec);
-        }
-        i = j;
-        continue;
-      }
-    }
-    return {lot, wafer, classLookup, defectsById};
   }
 
   function matchWafer(aoi, cp, cfg){
@@ -829,7 +721,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       bodyHtml += '<div class="wm-lot-group"><div class="wm-lot-title">LOT '+esc(lotName)+'（'+wafers.length+' 片 wafer）</div><div class="wm-grid">';
       for(const [wid, w] of wafers){
         const {svg, stats} = buildMiniWaferSVG(w);
-        bodyHtml += '<div class="wm-cell"><div class="wm-title"><a href="#'+mapWaferAnchorId(wid)+'" class="wm-title-link" data-wafer-link="'+esc(wid)+'" title="跳到下方「附加功能」對應的 '+esc(wid)+' 影像位置圖">'+esc(wid)+'</a></div>'+
+        bodyHtml += '<div class="wm-cell"><div class="wm-title">'+esc(wid)+'</div>'+
           '<div class="wm-svgwrap">'+svg+'</div>'+
           '<div class="wm-stats">'+
             '<span class="wm-stat wm-yellow">黃 '+stats.yellow+'</span>'+
@@ -843,38 +735,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       bodyHtml += '<div class="empty">尚無可繪製的 wafer map（需有對應 CP 檔的 wafer）</div>';
     }
     section.innerHTML = bodyHtml;
-    section.addEventListener('click', function(e){
-      const link = e.target.closest('.wm-title-link');
-      if(!link) return;
-      e.preventDefault();
-      jumpToMapWafer(link.getAttribute('data-wafer-link'));
-    });
     return section;
   }
-
-  // 將 wafer ID 轉為可安全用於 HTML id / URL hash 的字串（保留英數字與 - _，其餘轉為 _）
-  function mapWaferAnchorId(wid){
-    return 'mapwafer-' + String(wid).replace(/[^A-Za-z0-9_-]/g, '_');
-  }
-
-  // 點擊「所有 WAFER MAP 總覽」的 wafer ID，跳到下方「附加功能」對應的 wafer 卡片並短暫高亮；
-  // 若附加功能尚未匯入/比對出該 wafer，則捲動到附加功能區塊並提示使用者。
-  function jumpToMapWafer(wid){
-    const targetId = mapWaferAnchorId(wid);
-    const el = document.getElementById(targetId);
-    if(el){
-      el.scrollIntoView({behavior:'smooth', block:'start'});
-      el.classList.add('flash-highlight');
-      setTimeout(()=> el.classList.remove('flash-highlight'), 1600);
-    } else {
-      pendingJumpWafer = wid;
-      const anchor = document.getElementById('map-results') || document.getElementById('dz-map');
-      if(anchor) anchor.scrollIntoView({behavior:'smooth', block:'start'});
-      const statusEl = document.getElementById('status-map-msg');
-      if(statusEl) statusEl.textContent = '下方「附加功能」尚未有 Wafer「'+wid+'」的影像對應資料，請先於此上傳含影像檔的 AOI zip 並點擊「開始比對」（比對完成後將自動跳至該 wafer）。';
-    }
-  }
-  let pendingJumpWafer = null;
 
   function renderLotSection(lotName, lotObj){
     const section = document.createElement('section');
@@ -1078,607 +940,6 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   });
-
-  // =========================================================================
-  // 附加功能：AOI 影像檔（X_Y_Z.jpg）↔ Wafer Map 位置對應
-  //
-  // 換算公式（已用實際 .kla 缺陷紀錄與 .csv 網格逐筆核對驗證）：
-  //   影像檔名 X_Y_Z.jpg 中 X = XINDEX、Y = YINDEX、Z = wafer 內流水號（DEFECTID）
-  //   對應到 AOI .csv 網格中的位置為：row = ROWCT − 1 − Y，col = X
-  //   （因為 AOI .csv 的 RowData 第一列對應 wafer 最上緣，但廠商影像檔名的 Y 座標是由下往上算）
-  // =========================================================================
-
-  let mapZipFiles = []; // {name, file}
-  let lastMapResults = []; // 最近一次「解析並繪製對應圖」後，所有 wafer 的結果（供「匯出 all」使用）
-
-  function renderMapFileList(){
-    const listEl = document.getElementById('list-map');
-    listEl.innerHTML = '';
-    mapZipFiles.forEach((f, idx)=>{
-      const li = document.createElement('li');
-      const nameSpan = document.createElement('span');
-      nameSpan.className='fn'; nameSpan.textContent = f.name;
-      nameSpan.title = f.name;
-      const rightWrap = document.createElement('span');
-      rightWrap.style.display='flex'; rightWrap.style.gap='8px'; rightWrap.style.alignItems='center';
-      const sizeSpan = document.createElement('span');
-      sizeSpan.className='fw'; sizeSpan.textContent = fmtSize(f.file.size);
-      const btn = document.createElement('button');
-      btn.textContent = '✕'; btn.title='移除';
-      btn.onclick = (e)=>{ e.stopPropagation(); mapZipFiles.splice(idx,1); renderMapFileList(); };
-      rightWrap.appendChild(sizeSpan); rightWrap.appendChild(btn);
-      li.appendChild(nameSpan); li.appendChild(rightWrap);
-      listEl.appendChild(li);
-    });
-    document.getElementById('btn-map-analyze').disabled = mapZipFiles.length===0;
-  }
-
-  function setupMapDropzone(){
-    const zoneEl = document.getElementById('dz-map');
-    const inputEl = document.getElementById('input-map');
-    const statusEl = document.getElementById('status-map-msg');
-
-    async function addMapFiles(fileArr){
-      let skipped = 0;
-      for(const file of fileArr){
-        if(!/\.zip$/i.test(file.name)){ skipped++; continue; }
-        if(mapZipFiles.some(f=>f.name===file.name && f.file.size===file.size)) continue;
-        mapZipFiles.push({name:file.name, file});
-      }
-      renderMapFileList();
-      statusEl.textContent = skipped ? ('已略過 '+skipped+' 個非 .zip 檔案（此功能僅支援上傳 .zip）') : '';
-    }
-
-    inputEl.addEventListener('change', async ()=>{
-      await addMapFiles(Array.from(inputEl.files));
-      inputEl.value='';
-    });
-    zoneEl.addEventListener('click', e=>{
-      if(e.target.closest('.filelist')) return;
-      inputEl.click();
-    });
-    zoneEl.addEventListener('dragenter', e=>{ e.preventDefault(); zoneEl.classList.add('drag'); });
-    zoneEl.addEventListener('dragover', e=>{ e.preventDefault(); zoneEl.classList.add('drag'); });
-    zoneEl.addEventListener('dragleave', ()=> zoneEl.classList.remove('drag'));
-    zoneEl.addEventListener('drop', async e=>{
-      e.preventDefault(); zoneEl.classList.remove('drag');
-      const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
-      if(!files.length){
-        statusEl.textContent = '拖曳的內容中找不到檔案，請改用點擊選取 zip 檔。';
-        return;
-      }
-      await addMapFiles(files);
-    });
-  }
-  setupMapDropzone();
-
-  document.getElementById('btn-map-clear').addEventListener('click', ()=>{
-    mapZipFiles = [];
-    renderMapFileList();
-    document.getElementById('map-results').innerHTML = '<div class="empty">尚未匯入資料 — 請上傳完整 AOI zip 檔</div>';
-    document.getElementById('status-map-msg').textContent = '';
-    lastMapResults = [];
-    document.getElementById('btn-map-export-all').disabled = true;
-  });
-
-  // 依資料夾分組 zip 內的檔案：每組需同時有一份 .csv 與若干 X_Y_Z.jpg 才會被採用
-  // ---------- 最小可用 .xlsx 產生器（直接以 JSZip 組出 OOXML，避免額外引入 SheetJS）----------
-  function xlsxColName(idx){
-    let s='', n=idx+1;
-    while(n>0){
-      const rem=(n-1)%26;
-      s = String.fromCharCode(65+rem)+s;
-      n = Math.floor((n-1)/26);
-    }
-    return s;
-  }
-  function xmlEscape(v){
-    return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
-  }
-  function numOrEmpty(v){
-    if(v===undefined || v===null || v==='') return '';
-    const n = parseFloat(v);
-    return Number.isNaN(n) ? '' : n;
-  }
-  // 通用儲存格 XML；styleIdx 非 0 時，即使值為空也會輸出空白儲存格（讓整列底色能套用到空欄位）
-  function xlsxCellXml(ref, value, styleIdx){
-    const sAttr = styleIdx ? ' s="'+styleIdx+'"' : '';
-    if(value===null || value===undefined || value===''){
-      return styleIdx ? '<c r="'+ref+'"'+sAttr+'/>' : '';
-    }
-    if(typeof value === 'number' && Number.isFinite(value)){
-      return '<c r="'+ref+'"'+sAttr+'><v>'+value+'</v></c>';
-    }
-    return '<c r="'+ref+'"'+sAttr+' t="inlineStr"><is><t xml:space="preserve">'+xmlEscape(value)+'</t></is></c>';
-  }
-  // rowStyles（可省略）：與 rows 等長的陣列，值為 0（無底色）/2（淺黃＝Overkill Suspected）/3（淺紅＝Confirmed）
-  function xlsxBuildSheetXml(headers, rows, rowStyles){
-    let rowsXml = '';
-    let hcells = '';
-    headers.forEach((h,ci)=>{ hcells += xlsxCellXml(xlsxColName(ci)+'1', h, 1); });
-    rowsXml += '<row r="1">'+hcells+'</row>';
-    rows.forEach((row,ri)=>{
-      const rNum = ri+2;
-      const styleIdx = (rowStyles && rowStyles[ri]) ? rowStyles[ri] : 0;
-      let cells = '';
-      row.forEach((v,ci)=>{ cells += xlsxCellXml(xlsxColName(ci)+rNum, v, styleIdx); });
-      rowsXml += '<row r="'+rNum+'">'+cells+'</row>';
-    });
-    let colsXml = '<cols>';
-    headers.forEach((h,i)=>{ colsXml += '<col min="'+(i+1)+'" max="'+(i+1)+'" width="18" customWidth="1"/>'; });
-    colsXml += '</cols>';
-    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
-      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-      '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'+
-      colsXml+
-      '<sheetData>'+rowsXml+'</sheetData>'+
-      '</worksheet>';
-  }
-  // 共用樣式表：0=一般、1=粗體標題、2=淺黃底（Overkill Suspected：AOI Fail + CP Pass）、3=淺紅底（Confirmed：AOI Fail + CP Fail）
-  function xlsxStylesXml(){
-    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
-      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
-      '<fonts count="2"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><name val="Calibri"/></font></fonts>'+
-      '<fills count="4">'+
-        '<fill><patternFill patternType="none"/></fill>'+
-        '<fill><patternFill patternType="gray125"/></fill>'+
-        '<fill><patternFill patternType="solid"><fgColor rgb="FFFBF0DE"/><bgColor indexed="64"/></patternFill></fill>'+
-        '<fill><patternFill patternType="solid"><fgColor rgb="FFFBE7E5"/><bgColor indexed="64"/></patternFill></fill>'+
-      '</fills>'+
-      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'+
-      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-      '<cellXfs count="4">'+
-        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
-        '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
-        '<xf numFmtId="0" fontId="0" fillId="2" borderId="0" xfId="0" applyFill="1"/>'+
-        '<xf numFmtId="0" fontId="0" fillId="3" borderId="0" xfId="0" applyFill="1"/>'+
-      '</cellXfs>'+
-      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
-      '</styleSheet>';
-  }
-  // 單一工作表 xlsx（rowStyles 可省略，用於逐列標色）
-  async function buildXlsxBlob(sheetName, headers, rows, rowStyles){
-    return buildXlsxBlobMulti([{name:sheetName, headers, rows, rowStyles}]);
-  }
-  // 多工作表 xlsx：sheets = [{name, headers, rows, rowStyles?}, ...]
-  async function buildXlsxBlobMulti(sheets){
-    const usedNames = new Set();
-    const safeSheets = sheets.map((s, idx)=>{
-      let name = xmlEscape(String(s.name||('Sheet'+(idx+1))).replace(/[\[\]\*\?\/\\:]/g,'_').slice(0,31)) || ('Sheet'+(idx+1));
-      let base = name, n = 2;
-      while(usedNames.has(name)){ name = (base.slice(0,28))+'_'+n; n++; }
-      usedNames.add(name);
-      return {...s, safeName:name};
-    });
-
-    const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
-      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
-      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
-      '<Default Extension="xml" ContentType="application/xml"/>'+
-      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+
-      safeSheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+
-      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
-      '</Types>';
-    const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
-      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'+
-      '</Relationships>';
-    const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
-      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
-      '<sheets>'+safeSheets.map((s,i)=>'<sheet name="'+s.safeName+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets>'+
-      '</workbook>';
-    const workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
-      safeSheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+
-      '<Relationship Id="rId'+(safeSheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'+
-      '</Relationships>';
-
-    const zip = new JSZip();
-    zip.file('[Content_Types].xml', contentTypes);
-    zip.folder('_rels').file('.rels', rootRels);
-    const xlFolder = zip.folder('xl');
-    xlFolder.file('workbook.xml', workbookXml);
-    xlFolder.folder('_rels').file('workbook.xml.rels', workbookRels);
-    xlFolder.file('styles.xml', xlsxStylesXml());
-    const wsFolder = xlFolder.folder('worksheets');
-    safeSheets.forEach((s,i)=>{
-      wsFolder.file('sheet'+(i+1)+'.xml', xlsxBuildSheetXml(s.headers, s.rows, s.rowStyles));
-    });
-    return await zip.generateAsync({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-  }
-
-  // defect_XYZ 對照表的共用欄位定義
-  function defectXYZHeaders(){
-    return ['Wafer','X_Y_Z (檔名)','JPG 檔名','X (XINDEX,檔名)','Y (YINDEX,檔名)','Z (DEFECTID,wafer內流水號)',
-      '絕對座標X (um)','絕對座標Y (um)','Die內相對座標XREL (um)','Die內相對座標YREL (um)',
-      '缺陷尺寸XSIZE (um)','缺陷尺寸YSIZE (um)','缺陷等效尺寸DSIZE (um)','缺陷面積DEFECTAREA (um^2)',
-      '缺陷類別代碼','缺陷類別名稱','ROUGHBIN','FINEBIN','網格位置 (row,col)','AOI/CP 比對狀態'];
-  }
-  // 產生單一 wafer 的資料列，並依 Step 1 的 AOI↔CP 比對結果算出每列底色（rowStyles：2=淺黃/Overkill Suspected、3=淺紅/Confirmed，與網頁 wafer map 一致）
-  function buildDefectXYZRows(r){
-    const items = [...r.dieMap.values()].sort((a,b)=> a.row-b.row || a.col-b.col);
-    const statusByRC = getWaferStatusMap(r.wafer);
-    const rows = [];
-    const rowStyles = [];
-    for(const it of items){
-      const rec = r.klaData && r.klaData.defectsById.get(it.z);
-      let classCode = '', className = '';
-      if(rec){
-        classCode = numOrEmpty(rec.CLASSNUMBER);
-        const codeNum = parseInt(rec.CLASSNUMBER,10);
-        className = r.klaData.classLookup.has(codeNum)
-          ? r.klaData.classLookup.get(codeNum)
-          : ('(ClassLookup未定義代碼'+rec.CLASSNUMBER+')');
-      }
-      const st = statusByRC ? statusByRC.get(it.col+','+it.row) : null;
-      let styleIdx = 0, statusLabel;
-      if(st==='overkill'){ styleIdx = 2; statusLabel = 'Overkill Suspected（AOI Fail + CP Pass）'; }
-      else if(st==='confirmed'){ styleIdx = 3; statusLabel = 'Confirmed（AOI Fail + CP Fail）'; }
-      else if(st==='unmatched'){ styleIdx = 3; statusLabel = '未匹配（AOI Fail，CP 找不到對應座標）'; }
-      else if(statusByRC){ statusLabel = '其餘 die'; }
-      else { statusLabel = '（尚無 Step 1 CP 比對資料）'; }
-      rows.push([
-        r.wafer,
-        it.x+'_'+it.y+'_'+it.z,
-        it.x+'_'+it.y+'_'+it.z+'.jpg',
-        it.x, it.y, it.z,
-        rec?numOrEmpty(rec.X):'', rec?numOrEmpty(rec.Y):'',
-        rec?numOrEmpty(rec.XREL):'', rec?numOrEmpty(rec.YREL):'',
-        rec?numOrEmpty(rec.XSIZE):'', rec?numOrEmpty(rec.YSIZE):'',
-        rec?numOrEmpty(rec.DSIZE):'', rec?numOrEmpty(rec.DEFECTAREA):'',
-        classCode, className,
-        rec?numOrEmpty(rec.ROUGHBINNUMBER):'', rec?numOrEmpty(rec.FINEBINNUMBER):'',
-        '('+it.row+', '+it.col+')',
-        statusLabel
-      ]);
-      rowStyles.push(styleIdx);
-    }
-    return {rows, rowStyles};
-  }
-
-  // 匯出單一 wafer 的「defect_XYZ 對照表」xlsx：欄位對齊 AOI .kla 缺陷明細，並附加與網頁一致的「網格位置 (row,col)」欄位；
-  // 若 Step 1 已有該 wafer 的 CP 比對結果，逐列套用淺黃（Overkill Suspected）／淺紅（Confirmed）底色，與 wafer map 顏色一致。
-  async function exportDefectXYZXlsx(r, statusEl){
-    if(statusEl) statusEl.textContent = '產生中…';
-    try{
-      const headers = defectXYZHeaders();
-      const {rows, rowStyles} = buildDefectXYZRows(r);
-      const lotName = (r.aoi && r.aoi.lot) ? r.aoi.lot : r.wafer;
-      const blob = await buildXlsxBlob(r.wafer, headers, rows, rowStyles);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = lotName+'_defect_XYZ_對照表.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url), 4000);
-      if(statusEl) statusEl.textContent = r.klaData ? '已匯出（含缺陷資料）' : '已匯出（找不到 .kla 缺陷檔，僅含座標對照）';
-    }catch(err){
-      const msg = '匯出失敗：'+(err && err.message ? err.message : err);
-      if(statusEl) statusEl.textContent = msg; else alert(msg);
-    }
-  }
-
-  // 匯出「all defect_XYZ 對照表」：整合目前已解析出的全部 wafer，產生 1 個 Excel 檔——
-  // 第 1 個工作表 ALL 彙整所有 wafer 的資料列，其後每片 wafer 各自 1 個工作表；皆依 AOI/CP 狀態套用淺黃／淺紅底色。
-  async function exportAllDefectXYZXlsx(){
-    const statusEl = document.getElementById('status-map-msg');
-    if(!lastMapResults.length){
-      if(statusEl) statusEl.textContent = '目前沒有可匯出的資料，請先完成「解析並繪製對應圖」。';
-      return;
-    }
-    if(statusEl) statusEl.textContent = '產生 all defect_XYZ 對照表中…';
-    try{
-      const headers = defectXYZHeaders();
-      const sortedResults = [...lastMapResults].sort((a,b)=> a.wafer.localeCompare(b.wafer, undefined, {numeric:true}));
-      const sheets = [];
-      let allRows = [], allStyles = [];
-      for(const r of sortedResults){
-        const {rows, rowStyles} = buildDefectXYZRows(r);
-        allRows = allRows.concat(rows);
-        allStyles = allStyles.concat(rowStyles);
-        sheets.push({name:r.wafer, headers, rows, rowStyles});
-      }
-      sheets.unshift({name:'ALL', headers, rows:allRows, rowStyles:allStyles});
-      const blob = await buildXlsxBlobMulti(sheets);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'all_defect_XYZ_對照表_'+new Date().toISOString().slice(0,10)+'.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url), 4000);
-      if(statusEl) statusEl.textContent = '已匯出 all defect_XYZ 對照表（共 '+sortedResults.length+' 片 wafer、'+allRows.length+' 筆）。';
-    }catch(err){
-      const msg = '匯出失敗：'+(err && err.message ? err.message : err);
-      if(statusEl) statusEl.textContent = msg; else alert(msg);
-    }
-  }
-  document.getElementById('btn-map-export-all').addEventListener('click', exportAllDefectXYZXlsx);
-
-
-  async function extractMappingGroupsFromZip(file){
-    if(typeof JSZip === 'undefined'){
-      throw new Error('JSZip 函式庫未載入，無法解壓縮 zip');
-    }
-    const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const groups = new Map(); // dirPath -> {csvEntry, klaEntry, jpgEntries:[{entry,base}]}
-    for(const entry of Object.values(zip.files)){
-      if(entry.dir) continue;
-      const path = entry.name;
-      if(path.includes('__MACOSX')) continue;
-      const base = path.split('/').pop();
-      if(!base || base.startsWith('.')) continue;
-      const dir = path.slice(0, path.length - base.length);
-      if(!groups.has(dir)) groups.set(dir, {csvEntry:null, klaEntry:null, jpgEntries:[]});
-      const g = groups.get(dir);
-      if(/\.csv$/i.test(base)){
-        g.csvEntry = entry;
-      } else if(/\.kla$/i.test(base)){
-        g.klaEntry = entry;
-      } else if(/^(\d+)_(\d+)_(\d+)\.jpe?g$/i.test(base)){
-        g.jpgEntries.push({entry, base});
-      }
-    }
-    return groups;
-  }
-
-  async function processMapZipFile(file, warnings){
-    const results = [];
-    let groups;
-    try{
-      groups = await extractMappingGroupsFromZip(file);
-    }catch(err){
-      warnings.push(file.name+' 解壓縮失敗：'+(err && err.message ? err.message : err));
-      return results;
-    }
-    for(const [dir, g] of groups){
-      const label = file.name + (dir ? '  /  '+dir.replace(/\/$/,'') : '');
-      if(!g.csvEntry){
-        if(g.jpgEntries.length) warnings.push('（'+label+'）找到 '+g.jpgEntries.length+' 張影像檔，但同資料夾內找不到 .csv 網格檔，已略過。');
-        continue;
-      }
-      if(!g.jpgEntries.length) continue; // 只有網格、沒有影像可標註，略過
-      const bytes = await g.csvEntry.async('uint8array');
-      const text = decodeBytes(bytes);
-      const aoi = parseAOI(text);
-      if(!aoi.rowct || !aoi.colct){
-        warnings.push('（'+label+'）'+g.csvEntry.name+' 無法解析出 ROWCT/COLCT，已略過。');
-        continue;
-      }
-      const dieMap = new Map(); // "row,col" -> {row,col,x,y,z,all:[z,...]}
-      const outOfRange = [];
-      for(const {base} of g.jpgEntries){
-        const m = base.match(/^(\d+)_(\d+)_(\d+)\.jpe?g$/i);
-        if(!m) continue;
-        const x = parseInt(m[1],10), y = parseInt(m[2],10), z = parseInt(m[3],10);
-        const row = aoi.rowct - 1 - y;
-        const col = x;
-        if(row<0 || row>=aoi.rowct || col<0 || col>=aoi.colct){
-          outOfRange.push(base);
-          continue;
-        }
-        const key = row+','+col;
-        if(!dieMap.has(key)) dieMap.set(key, {row, col, x, y, z, all:[z]});
-        else dieMap.get(key).all.push(z);
-      }
-      if(outOfRange.length){
-        warnings.push('（'+(aoi.wafer||dir)+'）'+outOfRange.length+' 張影像檔名座標超出網格範圍：'+outOfRange.slice(0,5).join(', ')+(outOfRange.length>5?' …':''));
-      }
-      let klaData = null;
-      if(g.klaEntry){
-        try{
-          const klaBytes = await g.klaEntry.async('uint8array');
-          const klaText = decodeBytes(klaBytes);
-          klaData = parseKLA(klaText);
-        }catch(err){
-          warnings.push('（'+label+'）'+g.klaEntry.name+' 解析失敗，defect_XYZ 對照表匯出將缺少缺陷欄位資料：'+(err && err.message ? err.message : err));
-        }
-      }
-      results.push({
-        sourceLabel: label,
-        wafer: aoi.wafer || dir.replace(/\/$/,'') || file.name,
-        aoi,
-        dieMap,
-        klaData,
-        jpgTotal: g.jpgEntries.length
-      });
-    }
-    return results;
-  }
-
-  document.getElementById('btn-map-analyze').addEventListener('click', async ()=>{
-    const statusEl = document.getElementById('status-map-msg');
-    const resultsEl = document.getElementById('map-results');
-    statusEl.textContent = '解析中…';
-    resultsEl.innerHTML = '';
-    const warnings = [];
-    let allResults = [];
-    for(const f of mapZipFiles){
-      const r = await processMapZipFile(f.file, warnings);
-      allResults = allResults.concat(r);
-    }
-    if(!allResults.length){
-      resultsEl.innerHTML = '<div class="empty">找不到可對應的資料 — 請確認 zip 內每片 wafer 資料夾同時包含 .csv 網格檔與 X_Y_Z 命名的 jpg 影像檔</div>';
-      statusEl.textContent = warnings.length ? warnings.join(' ') : '';
-      lastMapResults = [];
-      document.getElementById('btn-map-export-all').disabled = true;
-      return;
-    }
-    allResults.sort((a,b)=> a.wafer.localeCompare(b.wafer, undefined, {numeric:true}));
-    for(const r of allResults){
-      resultsEl.appendChild(buildMapWaferBlock(r));
-    }
-    lastMapResults = allResults;
-    document.getElementById('btn-map-export-all').disabled = false;
-    statusEl.textContent = warnings.length ? ('注意：'+warnings.join(' ')) : ('完成，共 '+allResults.length+' 片 wafer。');
-    if(pendingJumpWafer){
-      const el = document.getElementById(mapWaferAnchorId(pendingJumpWafer));
-      if(el){
-        el.scrollIntoView({behavior:'smooth', block:'start'});
-        el.classList.add('flash-highlight');
-        setTimeout(()=> el.classList.remove('flash-highlight'), 1600);
-      }
-      pendingJumpWafer = null;
-    }
-  });
-
-  function buildMapWaferBlock(r){
-    const card = document.createElement('div');
-    card.className = 'map-wafer-card';
-    card.id = mapWaferAnchorId(r.wafer);
-
-    const head = document.createElement('div');
-    head.className = 'map-wafer-head';
-    const matchedCount = r.dieMap.size;
-    const dupCount = [...r.dieMap.values()].filter(v=>v.all.length>1).length;
-    head.innerHTML = '<b>'+esc(r.wafer)+'</b>'+
-      '<span class="map-wafer-sub">來源：'+esc(r.sourceLabel)+' ・ 影像張數 '+r.jpgTotal+' ・ 已標註位置 '+matchedCount+
-      (dupCount ? ' ・ 同位置多影像 '+dupCount+' 處（僅標示其中 1 個 Z）' : '')+'</span>';
-    card.appendChild(head);
-
-    const body = document.createElement('div');
-    body.className = 'map-wafer-body';
-    body.appendChild(buildMapGridSVG(r));
-
-    const listWrap = document.createElement('details');
-    listWrap.className = 'map-table-details';
-    const summary = document.createElement('summary');
-    summary.textContent = '檔名對照表（'+r.jpgTotal+' 筆）';
-    listWrap.appendChild(summary);
-
-    const exportBar = document.createElement('div');
-    exportBar.className = 'map-export-bar';
-    exportBar.style.cssText = 'margin:8px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;';
-    const exportBtn = document.createElement('button');
-    exportBtn.type = 'button';
-    exportBtn.className = 'ghost';
-    exportBtn.textContent = '匯出 defect_XYZ 對照表 (xlsx)';
-    const exportStatus = document.createElement('span');
-    exportStatus.style.cssText = 'font-size:12px; color:var(--muted,#8892a0);';
-    if(!r.klaData){
-      exportStatus.textContent = '（此 wafer 找不到 .kla 缺陷檔，匯出將只含座標對照）';
-    }
-    exportBtn.addEventListener('click', ()=> exportDefectXYZXlsx(r, exportStatus));
-    exportBar.appendChild(exportBtn);
-    exportBar.appendChild(exportStatus);
-    listWrap.appendChild(exportBar);
-
-    let rows = '<table><thead><tr><th>JPG 檔名</th><th>X (XINDEX)</th><th>Y (YINDEX)</th><th>標註 Z</th><th>網格位置 (row,col)</th></tr></thead><tbody>';
-    const items = [...r.dieMap.values()].sort((a,b)=> a.row-b.row || a.col-b.col);
-    const statusByRCForTable = getWaferStatusMap(r.wafer);
-    for(const it of items){
-      const zLabel = it.all.length>1 ? (it.z+'　（同 die 另有 Z = '+it.all.filter(z=>z!==it.z).join(', ')+'）') : String(it.z);
-      let rowClass = '';
-      if(statusByRCForTable){
-        const st = statusByRCForTable.get(it.col+','+it.row);
-        if(st==='overkill') rowClass = ' class="row-overkill"';
-        else if(st==='confirmed' || st==='unmatched') rowClass = ' class="row-confirmed"';
-      }
-      rows += '<tr'+rowClass+'><td>'+it.x+'_'+it.y+'_'+it.z+'.jpg</td><td>'+it.x+'</td><td>'+it.y+'</td><td>'+esc(zLabel)+'</td><td>('+it.row+', '+it.col+')</td></tr>';
-    }
-    rows += '</tbody></table>';
-    const tableBox = document.createElement('div');
-    tableBox.className = 'die-list';
-    tableBox.innerHTML = rows;
-    if(statusByRCForTable){
-      const tableLegend = document.createElement('div');
-      tableLegend.className = 'map-legend';
-      tableLegend.style.marginTop = '6px';
-      tableLegend.innerHTML =
-        '<span><i style="background:#FBF0DE; border:1px solid #E9D6A8;"></i>AOI Fail + CP Pass（Overkill Suspected）</span>'+
-        '<span><i style="background:#FBE7E5; border:1px solid #EFC2BD;"></i>AOI Fail + CP Fail（Confirmed）</span>';
-      listWrap.appendChild(tableLegend);
-    }
-    listWrap.appendChild(tableBox);
-    body.appendChild(listWrap);
-
-    card.appendChild(body);
-    return card;
-  }
-
-  // 從 Step 1「所有 WAFER MAP 總覽」的比對結果中，取出指定 wafer 的每個 die 狀態
-  // （key 為 'col,row'，對應 AOI defect 的 x,y），供附加功能區塊套用一致的顏色。
-  function getWaferStatusMap(waferId){
-    if(!lastResult) return null;
-    for(const [, lotObj] of lastResult.lots){
-      const w = lotObj.wafers.get(waferId);
-      if(w && w.result){
-        const m = new Map();
-        for(const d of w.result.details){ m.set(d.x+','+d.y, d.status); }
-        return m;
-      }
-    }
-    return null;
-  }
-
-  function buildMapGridSVG(r){
-    const aoi = r.aoi;
-    const cellSize = Math.max(16, Math.min(30, Math.floor(680/Math.max(aoi.rowct, aoi.colct))));
-    const gap = 2;
-    const wCols = aoi.colct, hRows = aoi.rowct;
-    const svgW = wCols*(cellSize+gap), svgH = hRows*(cellSize+gap);
-    const fontSize = Math.max(8, Math.min(11, Math.floor(cellSize*0.42)));
-
-    // 若 Step 1 已有此 wafer 的 AOI↔CP 比對結果，套用與「所有 WAFER MAP 總覽」一致的顏色：
-    // 黃 = AOI Fail 且 CP Pass（Overkill Suspected）；紅 = AOI Fail 且 CP Fail；綠 = 其餘 die。
-    // 若尚無比對結果，則退回原本「有無對應影像」的藍／灰配色。
-    const statusByRC = getWaferStatusMap(r.wafer);
-
-    let rects = '';
-    for(let i=0;i<aoi.grid.length;i++){
-      const row = aoi.grid[i];
-      for(let j=0;j<aoi.colct;j++){
-        const v = row[j];
-        if(v === undefined || v === '___') continue;
-        const x = j*(cellSize+gap), y = i*(cellSize+gap);
-        const hit = r.dieMap.get(i+','+j);
-        let fill, textFill = '#fff', statusText = '';
-        if(statusByRC){
-          const st = statusByRC.get(j+','+i);
-          if(st==='overkill'){ fill = '#F2C230'; textFill = '#3A2A00'; statusText = ' ・ AOI Fail + CP Pass（Overkill Suspected）'; }
-          else if(st==='confirmed' || st==='unmatched'){ fill = '#D6413B'; statusText = ' ・ AOI Fail + CP Fail（Confirmed）'; }
-          else { fill = '#3FA34D'; }
-        } else {
-          fill = hit ? '#2456C7' : '#DCE0E6';
-        }
-        const titleText = 'row='+i+' col='+j+(hit
-          ? (' → '+hit.x+'_'+hit.y+'_'+hit.z+'.jpg'+(hit.all.length>1 ? '（同 die 另有 Z='+hit.all.filter(z=>z!==hit.z).join(',')+'）' : ''))
-          : '（未匹配影像）')+statusText;
-        rects += '<rect x="'+x+'" y="'+y+'" width="'+cellSize+'" height="'+cellSize+'" rx="2" fill="'+fill+'"><title>'+esc(titleText)+'</title></rect>';
-        if(hit){
-          const tx = x+cellSize/2, ty = y+cellSize/2+fontSize*0.35;
-          rects += '<text x="'+tx+'" y="'+ty+'" font-size="'+fontSize+'" font-family="IBM Plex Mono, monospace" fill="'+textFill+'" text-anchor="middle" pointer-events="none">'+hit.z+'</text>';
-          if(hit.all.length>1){
-            rects += '<circle cx="'+(x+cellSize-3)+'" cy="'+(y+3)+'" r="2.6" fill="#2456C7"></circle>';
-          }
-        }
-      }
-    }
-    const legendHtml = statusByRC
-      ? ('<div class="map-legend">'+
-          '<span><i style="background:#F2C230"></i>AOI Fail + CP Pass（Overkill Suspected）</span>'+
-          '<span><i style="background:#D6413B"></i>AOI Fail + CP Fail（Confirmed）</span>'+
-          '<span><i style="background:#3FA34D"></i>其餘 die</span>'+
-          '<span><i style="background:#2456C7; border-radius:50%; width:8px; height:8px;"></i>同一 die 尚有其他 Z（多張影像同位置）</span>'+
-          '<span style="color:var(--muted);">數字＝已對應影像的 Z 編號</span>'+
-        '</div>')
-      : ('<div class="map-legend">'+
-          '<span><i style="background:#DCE0E6"></i>Die（無對應影像）</span>'+
-          '<span><i style="background:#2456C7"></i>Die（已對應影像，數字＝Z）</span>'+
-          '<span><i style="background:#B9781F; border-radius:50%; width:8px; height:8px;"></i>同一 die 尚有其他 Z（多張影像同位置）</span>'+
-          '<span style="color:var(--muted);">（尚無 Step 1 CP 比對資料，暫以是否有對應影像著色；請於上方 Step 1 匯入相同 wafer 的 AOI／CP 檔並完成比對後即會自動改為黃／紅／綠配色）</span>'+
-        '</div>');
-    const container = document.createElement('div');
-    container.innerHTML =
-      '<div>'+
-        legendHtml+
-        '<svg viewBox="0 0 '+svgW+' '+svgH+'" width="'+Math.min(svgW,760)+'" height="'+Math.min(svgH,760)+'" style="background:var(--surface-2); border-radius:8px; border:1px solid var(--line);">'+rects+'</svg>'+
-      '</div>';
-    return container;
-  }
 
 })();
 </script>
