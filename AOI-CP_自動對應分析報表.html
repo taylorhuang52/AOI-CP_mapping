@@ -189,6 +189,30 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     padding:1px 6px; border-radius:4px; font-family:var(--sans); font-weight:600;
   }
 
+  .wm-section .wm-lot-group{ margin-top:18px; }
+  .wm-section .wm-lot-group:first-of-type{ margin-top:6px; }
+  .wm-lot-title{
+    font-size:13px; font-weight:700; margin-bottom:10px; color:var(--ink);
+    font-family:var(--mono); background:var(--surface-2); display:inline-block;
+    padding:4px 10px; border-radius:6px; border:1px solid var(--line);
+  }
+  .wm-section .wm-grid{
+    display:grid; grid-template-columns:repeat(10, 1fr); gap:10px; margin-top:10px;
+  }
+  @media (max-width:1400px){ .wm-section .wm-grid{grid-template-columns:repeat(5,1fr);} }
+  @media (max-width:760px){ .wm-section .wm-grid{grid-template-columns:repeat(2,1fr);} }
+  .wm-cell{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:8px;
+    padding:8px; display:flex; flex-direction:column; align-items:center; gap:6px;
+  }
+  .wm-title{font-family:var(--mono); font-size:11px; font-weight:700; color:var(--ink);}
+  .wm-svgwrap svg{display:block; max-width:100%; height:auto;}
+  .wm-stats{display:flex; gap:6px; font-size:10.5px; font-family:var(--mono);}
+  .wm-stat{padding:1px 6px; border-radius:4px; font-weight:600;}
+  .wm-yellow{background:#FBF0DE; color:#B9781F;}
+  .wm-red{background:#FBE7E5; color:#B5342E;}
+  .wm-green{background:#E3F3E6; color:#1E7A34;}
+
   .wafer-detail{padding:16px 4px 22px;}
   .wafer-detail-inner{display:flex; gap:26px; flex-wrap:wrap; align-items:flex-start;}
   .legend{display:flex; gap:14px; font-size:11.5px; color:var(--muted); margin-bottom:10px; flex-wrap:wrap;}
@@ -224,7 +248,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       </div>
       <div>
         <h1>AOI–CP 自動對應分析報表</h1>
-        <div class="sub">匯入 AOI 標記檔與 CP 測試檔（可多批），自動比對座標並計算 Overkill / Confirmed</div>
+        <div class="sub">匯入 AOI 標記檔與 CP 測試檔（可多批），自動比對座標並計算 Overkill Suspected / Confirmed</div>
       </div>
     </div>
     <div class="formula">CP_XAdr = AOI_XINDEX + Xoff&nbsp;&nbsp;·&nbsp;&nbsp;CP_YAdr = AOI_YINDEX + Yoff</div>
@@ -642,6 +666,76 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     for(const [lotName, lotObj] of data.lots){
       root.appendChild(renderLotSection(lotName, lotObj));
     }
+
+    root.appendChild(buildOverviewSection(data));
+  }
+
+  // ---------- overview: all wafer maps, 10 per row, 3-color scheme ----------
+  // 黃 = AOI Fail 且 CP Pass (overkill) / 紅 = AOI Fail 且 CP Fail (confirmed，含未匹配) / 綠 = 其餘 die
+  function buildMiniWaferSVG(w){
+    const aoi = w.aoi;
+    const cellSize = Math.max(4, Math.min(9, Math.floor(180/Math.max(aoi.rowct, aoi.colct))));
+    const gap = 1;
+    const svgW = aoi.colct*(cellSize+gap), svgH = aoi.rowct*(cellSize+gap);
+
+    const statusByRC = new Map();
+    for(const d of w.result.details){
+      statusByRC.set(d.x+','+d.y, d.status);
+    }
+
+    let yellow=0, red=0, green=0;
+    let rects = '';
+    for(let i=0;i<aoi.grid.length;i++){
+      const row = aoi.grid[i];
+      for(let j=0;j<row.length;j++){
+        const v = row[j];
+        if(v === '___') continue;
+        const st = statusByRC.get(j+','+i);
+        let fill = '#3FA34D'; // green: 其餘 die
+        if(st==='overkill'){ fill = '#F2C230'; yellow++; }
+        else if(st==='confirmed' || st==='unmatched'){ fill = '#D6413B'; red++; }
+        else { green++; }
+        const x = j*(cellSize+gap), y = i*(cellSize+gap);
+        rects += '<rect x="'+x+'" y="'+y+'" width="'+cellSize+'" height="'+cellSize+'" rx="1" fill="'+fill+'"><title>('+j+','+i+') code='+v+'</title></rect>';
+      }
+    }
+    const svg = '<svg viewBox="0 0 '+svgW+' '+svgH+'" width="'+Math.min(svgW,190)+'" height="'+Math.min(svgH,190)+'" style="background:#F7F8FA;border-radius:6px;border:1px solid #DCE0E6;">'+rects+'</svg>';
+    return {svg, stats:{yellow, red, green}};
+  }
+
+  function buildOverviewSection(data){
+    const section = document.createElement('section');
+    section.className = 'card wm-section';
+
+    let bodyHtml = '<h2>所有 WAFER MAP 總覽</h2>'+
+      '<div class="hint">每片 wafer die 著色規則：<b style="color:#B9781F">黃色</b> = AOI Fail 且 CP Pass（Overkill Suspected）；'+
+      '<b style="color:#B5342E">紅色</b> = AOI Fail 且 CP Fail；<b style="color:#1E7A34">綠色</b> = 其餘 die。</div>';
+
+    let anyWafer = false;
+    for(const [lotName, lotObj] of data.lots){
+      const wafers = [...lotObj.wafers.entries()]
+        .filter(([wid,w])=>w.result)
+        .sort((a,b)=> a[0].localeCompare(b[0], undefined, {numeric:true}));
+      if(!wafers.length) continue;
+      anyWafer = true;
+      bodyHtml += '<div class="wm-lot-group"><div class="wm-lot-title">LOT '+esc(lotName)+'（'+wafers.length+' 片 wafer）</div><div class="wm-grid">';
+      for(const [wid, w] of wafers){
+        const {svg, stats} = buildMiniWaferSVG(w);
+        bodyHtml += '<div class="wm-cell"><div class="wm-title">'+esc(wid)+'</div>'+
+          '<div class="wm-svgwrap">'+svg+'</div>'+
+          '<div class="wm-stats">'+
+            '<span class="wm-stat wm-yellow">黃 '+stats.yellow+'</span>'+
+            '<span class="wm-stat wm-red">紅 '+stats.red+'</span>'+
+            '<span class="wm-stat wm-green">綠 '+stats.green+'</span>'+
+          '</div></div>';
+      }
+      bodyHtml += '</div></div>';
+    }
+    if(!anyWafer){
+      bodyHtml += '<div class="empty">尚無可繪製的 wafer map（需有對應 CP 檔的 wafer）</div>';
+    }
+    section.innerHTML = bodyHtml;
+    return section;
   }
 
   function renderLotSection(lotName, lotObj){
@@ -674,9 +768,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     strip.className = 'summary-strip';
     strip.innerHTML =
       stat('AOI 標記異常 die（去重複）', totalMarks, '') +
-      stat('Overkill（CP Pass → AOI 誤殺）', totalOverkill, totalMarks? (100*totalOverkill/totalMarks).toFixed(1)+'%':'', 'overkill') +
+      stat('Overkill Suspected（CP Pass → AOI 誤殺）', totalOverkill, totalMarks? (100*totalOverkill/totalMarks).toFixed(1)+'%':'', 'overkill') +
       stat('Confirmed（CP Fail → 真缺陷）', totalConfirmed, totalMarks? (100*totalConfirmed/totalMarks).toFixed(1)+'%':'', 'confirmed') +
-      stat('Overkill 率', rate.toFixed(1)+'%', '', 'rate');
+      stat('Overkill Suspected 率', rate.toFixed(1)+'%', '', 'rate');
     section.appendChild(strip);
 
     if(totalUnmatched>0){
@@ -689,7 +783,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const table = document.createElement('table');
     table.className = 'wafer-table';
     table.innerHTML = '<thead><tr>'+
-      '<th>Wafer</th><th>AOI標記</th><th>Overkill</th><th>Confirmed(真缺陷)</th><th>Confirmed_Die_XY(CP_XAdr/YAdr)</th><th>CP_Pass</th><th>CP_Fail</th>'+
+      '<th>Wafer</th><th>AOI標記</th><th>Overkill Suspected</th><th>Confirmed(真缺陷)</th><th>Confirmed_Die_XY(CP_XAdr/YAdr)</th><th>CP_Pass</th><th>CP_Fail</th>'+
       '</tr></thead>';
     const tbody = document.createElement('tbody');
 
@@ -760,7 +854,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     legend.className = 'legend';
     legend.innerHTML =
       '<span><i style="background:#DCE0E6"></i>正常 die</span>'+
-      '<span><i style="background:#C98A2C"></i>AOI 誤殺（Overkill）</span>'+
+      '<span><i style="background:#C98A2C"></i>AOI 誤殺（Overkill Suspected）</span>'+
       '<span><i style="background:#B5342E"></i>AOI 判斷正確（Confirmed）</span>'+
       '<span><i style="background:#999"></i>座標未匹配</span>';
     listWrap.appendChild(legend);
@@ -770,7 +864,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     let rows = '<table><thead><tr><th>AOI(X,Y)</th><th>CP(X,Y)</th><th>Bin#</th><th>結果</th></tr></thead><tbody>';
     for(const d of w.result.details){
       const tagClass = d.status;
-      const tagText = d.status==='overkill'?'Overkill':(d.status==='confirmed'?'Confirmed':'未匹配');
+      const tagText = d.status==='overkill'?'Overkill Suspected':(d.status==='confirmed'?'Confirmed':'未匹配');
       rows += '<tr><td>('+d.x+', '+d.y+')</td><td>('+d.cpX+', '+d.cpY+')</td><td>'+(d.bin===undefined?'—':d.bin)+'</td>'+
         '<td><span class="tag '+tagClass+'">'+tagText+'</span></td></tr>';
     }
@@ -823,7 +917,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   // ---------- export ----------
   document.getElementById('btn-export').addEventListener('click', ()=>{
     if(!lastResult) return;
-    let csv = 'Lot,Wafer,AOI標記,Overkill,Confirmed,Confirmed_Die_XY(CP_XAdr/YAdr),CP_Pass,CP_Fail,未匹配\n';
+    let csv = 'Lot,Wafer,AOI標記,Overkill Suspected,Confirmed,Confirmed_Die_XY(CP_XAdr/YAdr),CP_Pass,CP_Fail,未匹配\n';
     for(const [lotName, lotObj] of lastResult.lots){
       const wafers = [...lotObj.wafers.entries()].sort((a,b)=> a[0].localeCompare(b[0], undefined, {numeric:true}));
       for(const [wid, w] of wafers){
