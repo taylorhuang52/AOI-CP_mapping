@@ -442,6 +442,55 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     return {lot, wafer, dieMap, passCount, failCount, headerFound: headerIdx>=0};
   }
 
+  // ---------- .kla（KLARF）缺陷明細解析 ----------
+  function parseKLA(text){
+    const lines = text.split(/\r\n|\n/);
+    let lot=null, wafer=null;
+    const classLookup = new Map();
+    let specFields = null;
+    const defectsById = new Map();
+    let inClassLookup = false;
+    for(let i=0;i<lines.length;i++){
+      const l = lines[i].trim();
+      if(!l) continue;
+      if(lot===null){ const m=l.match(/^LotID\s+"([^"]*)"/); if(m) lot=m[1]; }
+      if(wafer===null){ const m=l.match(/^WaferID\s+"([^"]*)"/); if(m) wafer=m[1]; }
+      if(/^ClassLookup\s+\d+/.test(l)){ inClassLookup = true; continue; }
+      if(inClassLookup){
+        const m = l.match(/^(\d+)\s+"([^"]*)"\s*;?$/);
+        if(m){
+          classLookup.set(parseInt(m[1],10), m[2]);
+          if(/;\s*$/.test(l)) inClassLookup = false;
+          continue;
+        } else {
+          inClassLookup = false;
+        }
+      }
+      if(/^DefectRecordSpec\s+\d+/.test(l)){
+        const m = l.match(/^DefectRecordSpec\s+\d+\s+(.+?);?\s*$/);
+        if(m) specFields = m[1].trim().replace(/;$/,'').split(/\s+/);
+        continue;
+      }
+      if(l === 'DefectList'){
+        let j=i+1;
+        while(j<lines.length && !lines[j].trim()) j++;
+        if(j<lines.length && specFields){
+          const dataLine = lines[j].trim().replace(/;\s*$/,'');
+          const tokens = dataLine.split(/\s+/);
+          const rec = {};
+          for(let k=0;k<specFields.length-1 && k<tokens.length;k++){
+            rec[specFields[k]] = tokens[k];
+          }
+          const id = parseInt(rec.DEFECTID,10);
+          if(!Number.isNaN(id)) defectsById.set(id, rec);
+        }
+        i = j;
+        continue;
+      }
+    }
+    return {lot, wafer, classLookup, defectsById};
+  }
+
   function matchWafer(aoi, cp, cfg){
     let overkill=0, confirmed=0, unmatched=0;
     const details = [];
@@ -1071,12 +1120,152 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   });
 
   // 依資料夾分組 zip 內的檔案：每組需同時有一份 .csv 與若干 X_Y_Z.jpg 才會被採用
+  // ---------- 最小可用 .xlsx 產生器（直接以 JSZip 組出 OOXML，避免額外引入 SheetJS）----------
+  function xlsxColName(idx){
+    let s='', n=idx+1;
+    while(n>0){
+      const rem=(n-1)%26;
+      s = String.fromCharCode(65+rem)+s;
+      n = Math.floor((n-1)/26);
+    }
+    return s;
+  }
+  function xmlEscape(v){
+    return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+  }
+  function numOrEmpty(v){
+    if(v===undefined || v===null || v==='') return '';
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? '' : n;
+  }
+  async function buildXlsxBlob(sheetName, headers, rows){
+    const safeSheetName = xmlEscape(String(sheetName||'Sheet1').replace(/[\[\]\*\?\/\\:]/g,'_').slice(0,31)) || 'Sheet1';
+    function cellXml(ref, value, styleIdx){
+      if(value===null || value===undefined || value==='') return '';
+      const sAttr = styleIdx ? ' s="'+styleIdx+'"' : '';
+      if(typeof value === 'number' && Number.isFinite(value)){
+        return '<c r="'+ref+'"'+sAttr+'><v>'+value+'</v></c>';
+      }
+      return '<c r="'+ref+'"'+sAttr+' t="inlineStr"><is><t xml:space="preserve">'+xmlEscape(value)+'</t></is></c>';
+    }
+    let rowsXml = '';
+    let hcells = '';
+    headers.forEach((h,ci)=>{ hcells += cellXml(xlsxColName(ci)+'1', h, 1); });
+    rowsXml += '<row r="1">'+hcells+'</row>';
+    rows.forEach((row,ri)=>{
+      const rNum = ri+2;
+      let cells = '';
+      row.forEach((v,ci)=>{ cells += cellXml(xlsxColName(ci)+rNum, v, 0); });
+      rowsXml += '<row r="'+rNum+'">'+cells+'</row>';
+    });
+    let colsXml = '<cols>';
+    headers.forEach((h,i)=>{ colsXml += '<col min="'+(i+1)+'" max="'+(i+1)+'" width="18" customWidth="1"/>'; });
+    colsXml += '</cols>';
+
+    const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'+
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'+
+      '<Default Extension="xml" ContentType="application/xml"/>'+
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'+
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+      '</Types>';
+    const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'+
+      '</Relationships>';
+    const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+      '<sheets><sheet name="'+safeSheetName+'" sheetId="1" r:id="rId1"/></sheets>'+
+      '</workbook>';
+    const workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'+
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'+
+      '</Relationships>';
+    const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+      '<fonts count="2"><font><sz val="10"/><name val="Calibri"/></font><font><b/><sz val="10"/><name val="Calibri"/></font></fonts>'+
+      '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'+
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'+
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+      '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'+
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'+
+      '</styleSheet>';
+    const sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'+
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+      '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'+
+      colsXml+
+      '<sheetData>'+rowsXml+'</sheetData>'+
+      '</worksheet>';
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', contentTypes);
+    zip.folder('_rels').file('.rels', rootRels);
+    const xlFolder = zip.folder('xl');
+    xlFolder.file('workbook.xml', workbookXml);
+    xlFolder.folder('_rels').file('workbook.xml.rels', workbookRels);
+    xlFolder.file('styles.xml', stylesXml);
+    xlFolder.folder('worksheets').file('sheet1.xml', sheetXml);
+    return await zip.generateAsync({type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  }
+
+  // 匯出單一 wafer 的「defect_XYZ 對照表」xlsx：欄位對齊 AOI .kla 缺陷明細，並附加與網頁一致的「網格位置 (row,col)」欄位
+  async function exportDefectXYZXlsx(r, statusEl){
+    if(statusEl) statusEl.textContent = '產生中…';
+    try{
+      const items = [...r.dieMap.values()].sort((a,b)=> a.row-b.row || a.col-b.col);
+      const headers = ['Wafer','X_Y_Z (檔名)','JPG 檔名','X (XINDEX,檔名)','Y (YINDEX,檔名)','Z (DEFECTID,wafer內流水號)',
+        '絕對座標X (um)','絕對座標Y (um)','Die內相對座標XREL (um)','Die內相對座標YREL (um)',
+        '缺陷尺寸XSIZE (um)','缺陷尺寸YSIZE (um)','缺陷等效尺寸DSIZE (um)','缺陷面積DEFECTAREA (um^2)',
+        '缺陷類別代碼','缺陷類別名稱','ROUGHBIN','FINEBIN','網格位置 (row,col)'];
+      const rows = items.map(it=>{
+        const rec = r.klaData && r.klaData.defectsById.get(it.z);
+        let classCode = '', className = '';
+        if(rec){
+          classCode = numOrEmpty(rec.CLASSNUMBER);
+          const codeNum = parseInt(rec.CLASSNUMBER,10);
+          className = r.klaData.classLookup.has(codeNum)
+            ? r.klaData.classLookup.get(codeNum)
+            : ('(ClassLookup未定義代碼'+rec.CLASSNUMBER+')');
+        }
+        return [
+          r.wafer,
+          it.x+'_'+it.y+'_'+it.z,
+          it.x+'_'+it.y+'_'+it.z+'.jpg',
+          it.x, it.y, it.z,
+          rec?numOrEmpty(rec.X):'', rec?numOrEmpty(rec.Y):'',
+          rec?numOrEmpty(rec.XREL):'', rec?numOrEmpty(rec.YREL):'',
+          rec?numOrEmpty(rec.XSIZE):'', rec?numOrEmpty(rec.YSIZE):'',
+          rec?numOrEmpty(rec.DSIZE):'', rec?numOrEmpty(rec.DEFECTAREA):'',
+          classCode, className,
+          rec?numOrEmpty(rec.ROUGHBINNUMBER):'', rec?numOrEmpty(rec.FINEBINNUMBER):'',
+          '('+it.row+', '+it.col+')'
+        ];
+      });
+      const lotName = (r.aoi && r.aoi.lot) ? r.aoi.lot : r.wafer;
+      const blob = await buildXlsxBlob(r.wafer, headers, rows);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = lotName+'_defect_XYZ_對照表.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      if(statusEl) statusEl.textContent = r.klaData ? '已匯出（含缺陷資料）' : '已匯出（找不到 .kla 缺陷檔，僅含座標對照）';
+    }catch(err){
+      const msg = '匯出失敗：'+(err && err.message ? err.message : err);
+      if(statusEl) statusEl.textContent = msg; else alert(msg);
+    }
+  }
+
   async function extractMappingGroupsFromZip(file){
     if(typeof JSZip === 'undefined'){
       throw new Error('JSZip 函式庫未載入，無法解壓縮 zip');
     }
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const groups = new Map(); // dirPath -> {csvEntry, jpgEntries:[{entry,base}]}
+    const groups = new Map(); // dirPath -> {csvEntry, klaEntry, jpgEntries:[{entry,base}]}
     for(const entry of Object.values(zip.files)){
       if(entry.dir) continue;
       const path = entry.name;
@@ -1084,10 +1273,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const base = path.split('/').pop();
       if(!base || base.startsWith('.')) continue;
       const dir = path.slice(0, path.length - base.length);
-      if(!groups.has(dir)) groups.set(dir, {csvEntry:null, jpgEntries:[]});
+      if(!groups.has(dir)) groups.set(dir, {csvEntry:null, klaEntry:null, jpgEntries:[]});
       const g = groups.get(dir);
       if(/\.csv$/i.test(base)){
         g.csvEntry = entry;
+      } else if(/\.kla$/i.test(base)){
+        g.klaEntry = entry;
       } else if(/^(\d+)_(\d+)_(\d+)\.jpe?g$/i.test(base)){
         g.jpgEntries.push({entry, base});
       }
@@ -1137,11 +1328,22 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if(outOfRange.length){
         warnings.push('（'+(aoi.wafer||dir)+'）'+outOfRange.length+' 張影像檔名座標超出網格範圍：'+outOfRange.slice(0,5).join(', ')+(outOfRange.length>5?' …':''));
       }
+      let klaData = null;
+      if(g.klaEntry){
+        try{
+          const klaBytes = await g.klaEntry.async('uint8array');
+          const klaText = decodeBytes(klaBytes);
+          klaData = parseKLA(klaText);
+        }catch(err){
+          warnings.push('（'+label+'）'+g.klaEntry.name+' 解析失敗，defect_XYZ 對照表匯出將缺少缺陷欄位資料：'+(err && err.message ? err.message : err));
+        }
+      }
       results.push({
         sourceLabel: label,
         wafer: aoi.wafer || dir.replace(/\/$/,'') || file.name,
         aoi,
         dieMap,
+        klaData,
         jpgTotal: g.jpgEntries.length
       });
     }
@@ -1193,6 +1395,24 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     const summary = document.createElement('summary');
     summary.textContent = '檔名對照表（'+r.jpgTotal+' 筆）';
     listWrap.appendChild(summary);
+
+    const exportBar = document.createElement('div');
+    exportBar.className = 'map-export-bar';
+    exportBar.style.cssText = 'margin:8px 0; display:flex; align-items:center; gap:8px; flex-wrap:wrap;';
+    const exportBtn = document.createElement('button');
+    exportBtn.type = 'button';
+    exportBtn.className = 'ghost';
+    exportBtn.textContent = '匯出 defect_XYZ 對照表 (xlsx)';
+    const exportStatus = document.createElement('span');
+    exportStatus.style.cssText = 'font-size:12px; color:var(--muted,#8892a0);';
+    if(!r.klaData){
+      exportStatus.textContent = '（此 wafer 找不到 .kla 缺陷檔，匯出將只含座標對照）';
+    }
+    exportBtn.addEventListener('click', ()=> exportDefectXYZXlsx(r, exportStatus));
+    exportBar.appendChild(exportBtn);
+    exportBar.appendChild(exportStatus);
+    listWrap.appendChild(exportBar);
+
     let rows = '<table><thead><tr><th>JPG 檔名</th><th>X (XINDEX)</th><th>Y (YINDEX)</th><th>標註 Z</th><th>網格位置 (row,col)</th></tr></thead><tbody>';
     const items = [...r.dieMap.values()].sort((a,b)=> a.row-b.row || a.col-b.col);
     for(const it of items){
