@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOI 樣本分類工具｜Confirmed / Overkill Suspected</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#0b1220;
+    --panel:#101a2c;
+    --panel-2:#0d1626;
+    --line:#22314a;
+    --ink:#e7edf6;
+    --ink-dim:#93a3bd;
+    --teal:#2dd4bf;
+    --teal-dim:#0f766e;
+    --amber:#f0b429;
+    --red:#f0575d;
+    --red-dim:#7f1d1d;
+    --green:#34d399;
+    --green-dim:#065f46;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 85% -10%, rgba(45,212,191,0.08), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(240,87,93,0.06), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.5;
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;}
+  header.hero{margin-bottom:36px;}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    color:var(--teal);
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .eyebrow::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal);}
+  h1{
+    font-size:clamp(24px,3.4vw,34px);
+    margin:10px 0 8px;
+    font-weight:650;
+    letter-spacing:-0.01em;
+  }
+  .sub{color:var(--ink-dim);font-size:15px;max-width:640px;}
+
+  .panel{
+    background:linear-gradient(180deg, var(--panel), var(--panel-2));
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px 24px;
+    margin-bottom:22px;
+  }
+  .panel h2{
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--ink-dim);
+    margin:0 0 4px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .step-num{
+    font-family:var(--mono);
+    font-size:12px;
+    width:22px;height:22px;
+    border-radius:6px;
+    background:rgba(45,212,191,0.12);
+    color:var(--teal);
+    display:inline-flex;align-items:center;justify-content:center;
+    flex:none;
+  }
+  .panel .desc{color:var(--ink-dim);font-size:13.5px;margin-bottom:16px;}
+
+  .filerow{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  input[type=file]{
+    color:var(--ink-dim);
+    font-size:13px;
+    max-width:100%;
+  }
+  input[type=file]::file-selector-button{
+    background:var(--teal-dim);
+    color:#e8fffb;
+    border:none;
+    padding:9px 14px;
+    border-radius:8px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    margin-right:10px;
+  }
+  button.btn{
+    background:var(--teal-dim);
+    color:#e8fffb;
+    border:1px solid rgba(45,212,191,0.35);
+    padding:10px 18px;
+    border-radius:9px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  button.btn:hover{filter:brightness(1.12);}
+  button.btn:active{transform:translateY(1px);}
+  button.btn:disabled{opacity:.4;cursor:not-allowed;filter:none;}
+  button.btn.secondary{
+    background:transparent;
+    color:var(--ink-dim);
+    border:1px solid var(--line);
+  }
+  button.btn.secondary:hover{color:var(--ink);border-color:var(--ink-dim);}
+  button.btn.danger{
+    background:rgba(240,87,93,0.08);
+    border-color:rgba(240,87,93,0.3);
+    color:#ffd6d6;
+  }
+
+  .status-line{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--ink-dim);
+    margin-top:12px;
+    min-height:18px;
+    white-space:pre-wrap;
+  }
+  .status-line.ok{color:var(--green);}
+  .status-line.err{color:var(--red);}
+
+  .stat-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:12px;
+    margin-top:16px;
+  }
+  .stat-card{
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px 16px;
+    background:rgba(255,255,255,0.02);
+  }
+  .stat-card .n{
+    font-family:var(--mono);
+    font-size:26px;
+    font-weight:700;
+    line-height:1.1;
+  }
+  .stat-card .l{
+    font-size:12px;
+    color:var(--ink-dim);
+    margin-top:4px;
+  }
+  .stat-card.confirmed .n{color:var(--red);}
+  .stat-card.overkill .n{color:var(--teal);}
+  .stat-card.unmatched .n{color:var(--amber);}
+  .stat-card.total .n{color:var(--ink);}
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:14px;
+    font-size:13px;
+  }
+  th,td{
+    text-align:left;
+    padding:8px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  th{
+    color:var(--ink-dim);
+    font-weight:600;
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+  }
+  td.num, th.num{text-align:right;font-family:var(--mono);}
+  tr:hover td{background:rgba(255,255,255,0.02);}
+  .tag{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:20px;
+    font-size:11px;
+    font-family:var(--mono);
+  }
+  .tag.c22{background:rgba(148,163,184,0.15);color:#9fb0c9;}
+  .tag.c23{background:rgba(240,180,41,0.15);color:var(--amber);}
+
+  .badge-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .badge{
+    font-family:var(--mono);
+    font-size:12px;
+    padding:5px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+  }
+
+  .scroll-box{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  .scroll-box table{margin-top:0;}
+  .scroll-box thead th{position:sticky;top:0;background:var(--panel-2);}
+
+  footer{
+    margin-top:40px;
+    color:var(--ink-dim);
+    font-size:12px;
+    text-align:center;
+  }
+
+  .note{
+    font-size:12.5px;
+    color:var(--ink-dim);
+    border-left:2px solid var(--teal-dim);
+    padding:8px 12px;
+    background:rgba(45,212,191,0.05);
+    border-radius:0 8px 8px 0;
+    margin-top:14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">wafer aoi &middot; overkill / confirmed dataset builder</div>
+    <h1>AOI 樣本分類與匯出工具</h1>
+    <p class="sub">上傳「AOI-CP 對照表」與 AOI 整包輸出 zip，自動比對每張缺陷照片是 <b style="color:var(--red)">Confirmed</b>（真缺陷）還是 <b style="color:var(--teal)">Overkill Suspected</b>（誤殺），並打包成可直接用於模型訓練的資料集。</p>
+  </header>
+
+  <!-- STEP 1 -->
+  <section class="panel">
+    <h2><span class="step-num">1</span>上傳 AOI-CP 對照表（.xlsx）</h2>
+    <p class="desc">會讀取「ALL」工作表（若無則合併所有工作表並去重），比對欄位：Wafer、X_Y_Z(檔名)、缺陷類別代碼、AOI/CP 比對狀態。</p>
+    <div class="filerow">
+      <input type="file" id="tableInput" accept=".xlsx,.xls" />
+    </div>
+    <div class="status-line" id="tableStatus">尚未上傳對照表。</div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="panel">
+    <h2><span class="step-num">2</span>上傳 AOI 整包輸出（.zip，可多選、可分批多次上傳）</h2>
+    <p class="desc">每個 zip 內應包含各 wafer 資料夾（例如 RP69675-18/），資料夾內含缺陷照片 X_Y_Z.jpg。可一次選多個 zip，也可以之後再加。</p>
+    <div class="filerow">
+      <input type="file" id="zipInput" accept=".zip" multiple />
+      <button class="btn" id="processBtn" disabled>開始比對分類</button>
+    </div>
+    <div class="status-line" id="zipStatus">尚未上傳 AOI 封包。</div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="panel" id="resultsPanel" style="display:none;">
+    <h2><span class="step-num">3</span>比對結果總覽</h2>
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="badge-row" id="classBadges"></div>
+
+    <div class="note">
+      提示：缺陷類別代碼 <span class="tag c22">22</span> 為 ClassLookup 未定義代碼，目前對區分 Confirmed/Overkill 沒有參考價值；<span class="tag c23">23</span>（Polymer Damage）仍有參考價值，匯出檔名會保留類別代碼供後續模型訓練篩選使用。
+    </div>
+
+    <div style="margin-top:20px;">
+      <h2 style="margin-bottom:10px;"><span class="step-num">4</span>各 Wafer 明細</h2>
+      <div class="scroll-box">
+        <table>
+          <thead>
+            <tr>
+              <th>Wafer</th>
+              <th class="num">Confirmed</th>
+              <th class="num">Overkill</th>
+              <th class="num">未匹配</th>
+              <th class="num">合計</th>
+            </tr>
+          </thead>
+          <tbody id="waferTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="filerow" style="margin-top:22px;">
+      <button class="btn" id="exportBtn">下載分類後資料集（zip）</button>
+      <button class="btn secondary" id="clearSessionBtn">清除本次比對結果</button>
+    </div>
+    <div class="status-line" id="exportStatus"></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="panel">
+    <h2><span class="step-num">H</span>累計處理紀錄（跨批次自動累加，儲存在你的瀏覽器）</h2>
+    <p class="desc">每次成功比對分類後，會把各 wafer 的統計數字累加記錄下來，方便追蹤總共累積了多少 Confirmed 樣本。這裡只存數字統計，不存照片本體。</p>
+    <div class="scroll-box" style="max-height:260px;">
+      <table>
+        <thead>
+          <tr>
+            <th>Lot</th>
+            <th>Wafer</th>
+            <th class="num">Confirmed</th>
+            <th class="num">Overkill</th>
+            <th>最後處理時間</th>
+          </tr>
+        </thead>
+        <tbody id="historyTableBody"><tr><td colspan="5" style="color:var(--ink-dim);">載入中...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="stat-grid" id="historyTotals" style="margin-top:14px;"></div>
+    <div class="filerow" style="margin-top:16px;">
+      <button class="btn danger" id="clearHistoryBtn">清除累計歷史紀錄</button>
+    </div>
+    <div class="status-line" id="historyStatus"></div>
+  </section>
+
+  <footer>純前端執行，檔案不會上傳到任何伺服器。歷史統計數字儲存在你目前使用的瀏覽器中。</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- state ----------
+  let lookup = new Map();           // key: `${wafer}||${xyz}` -> record
+  let tableLoaded = false;
+  let matched = [];                 // [{wafer, xyz, jpgPath, status, classCode, className, roughbin, area, zipEntry}]
+  let waferStats = new Map();       // wafer -> {confirmed, overkill, unmatched, lot}
+
+  const el = id => document.getElementById(id);
+
+  function setStatus(id, text, cls){
+    const node = el(id);
+    node.textContent = text;
+    node.className = "status-line" + (cls ? " " + cls : "");
+  }
+
+  // ---------- STEP 1: parse comparison table ----------
+  el("tableInput").addEventListener("change", async (ev) => {
+    const file = ev.target.files[0];
+    if(!file) return;
+    setStatus("tableStatus", "讀取中...");
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array"});
+      lookup = new Map();
+
+      const sheetNames = wb.SheetNames.includes("ALL") ? ["ALL"] : wb.SheetNames;
+
+      let rowsLoaded = 0;
+      for(const sn of sheetNames){
+        const ws = wb.Sheets[sn];
+        const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:""});
+        if(!rows.length) continue;
+
+        // find header row (first row containing 'Wafer')
+        let headerIdx = -1;
+        for(let i=0;i<Math.min(rows.length,5);i++){
+          if(rows[i].some(c => String(c).trim() === "Wafer")){ headerIdx = i; break; }
+        }
+        if(headerIdx === -1) continue;
+
+        const header = rows[headerIdx].map(c => String(c).trim());
+        const colIdx = name => header.indexOf(name);
+
+        const iWafer = colIdx("Wafer");
+        const iXYZ = colIdx("X_Y_Z (檔名)");
+        const iClassCode = colIdx("缺陷類別代碼");
+        const iClassName = colIdx("缺陷類別名稱");
+        const iRough = colIdx("ROUGHBIN");
+        const iArea = colIdx("缺陷面積DEFECTAREA (um^2)");
+        const iStatus = colIdx("AOI/CP 比對狀態");
+
+        if(iWafer === -1 || iXYZ === -1 || iStatus === -1) continue;
+
+        for(let r=headerIdx+1;r<rows.length;r++){
+          const row = rows[r];
+          if(!row || row.length===0) continue;
+          const wafer = String(row[iWafer]||"").trim();
+          const xyz = String(row[iXYZ]||"").trim();
+          if(!wafer || !xyz) continue;
+          const status = String(row[iStatus]||"").trim();
+          const key = wafer + "||" + xyz;
+          lookup.set(key, {
+            wafer, xyz,
+            classCode: iClassCode>=0 ? String(row[iClassCode]||"").trim() : "",
+            className: iClassName>=0 ? String(row[iClassName]||"").trim() : "",
+            roughbin: iRough>=0 ? String(row[iRough]||"").trim() : "",
+            area: iArea>=0 ? row[iArea] : "",
+            status
+          });
+          rowsLoaded++;
+        }
+      }
+
+      tableLoaded = lookup.size > 0;
+      if(tableLoaded){
+        const wafers = new Set([...lookup.values()].map(v=>v.wafer));
+        setStatus("tableStatus", `已載入 ${lookup.size} 筆對照紀錄，涵蓋 ${wafers.size} 片 wafer。`, "ok");
+      } else {
+        setStatus("tableStatus", "找不到可用的欄位（需要 Wafer / X_Y_Z (檔名) / AOI/CP 比對狀態），請確認檔案格式。", "err");
+      }
+      updateProcessBtn();
+    }catch(e){
+      console.error(e);
+      setStatus("tableStatus", "讀取失敗：" + e.message, "err");
+    }
+  });
+
+  // ---------- STEP 2: zip selection ----------
+  let pendingZipFiles = [];
+  el("zipInput").addEventListener("change", (ev) => {
+    pendingZipFiles = Array.from(ev.target.files || []);
+    setStatus("zipStatus", pendingZipFiles.length
+      ? `已選取 ${pendingZipFiles.length} 個 zip 檔，尚未比對。按下「開始比對分類」進行處理。`
+      : "尚未上傳 AOI 封包。");
+    updateProcessBtn();
+  });
+
+  function updateProcessBtn(){
+    el("processBtn").disabled = !(tableLoaded && pendingZipFiles.length>0);
+  }
+
+  // ---------- STEP 2b: process zips ----------
+  el("processBtn").addEventListener("click", async () => {
+    if(!tableLoaded || pendingZipFiles.length===0) return;
+    el("processBtn").disabled = true;
+    let processedFiles = 0, processedImgs = 0;
+
+    try{
+      for(const file of pendingZipFiles){
+        setStatus("zipStatus", `處理中：${file.name} ...`);
+        const zip = await JSZip.loadAsync(file);
+        const entries = Object.values(zip.files).filter(e => !e.dir && /\.jpe?g$/i.test(e.name));
+
+        for(const entry of entries){
+          const parts = entry.name.split("/").filter(Boolean);
+          const fileNameNoExt = parts[parts.length-1].replace(/\.jpe?g$/i, "");
+          // wafer id = immediate parent folder name if available, else lot from zip filename
+          const wafer = parts.length >= 2 ? parts[parts.length-2] : file.name.replace(/\.zip$/i,"");
+
+          const key = wafer + "||" + fileNameNoExt;
+          const rec = lookup.get(key);
+
+          let statusCat = "unmatched";
+          let classCode = "", className = "", roughbin = "", area = "";
+          if(rec){
+            classCode = rec.classCode; className = rec.className; roughbin = rec.roughbin; area = rec.area;
+            if(rec.status.indexOf("Confirmed") !== -1) statusCat = "confirmed";
+            else if(rec.status.indexOf("Overkill") !== -1) statusCat = "overkill";
+            else statusCat = "other";
+          }
+
+          matched.push({
+            wafer, xyz: fileNameNoExt, jpgPath: entry.name,
+            status: statusCat, classCode, className, roughbin, area,
+            zipEntry: entry
+          });
+
+          if(!waferStats.has(wafer)) waferStats.set(wafer, {confirmed:0, overkill:0, unmatched:0, other:0, lot: wafer.split("-")[0]});
+          const ws = waferStats.get(wafer);
+          if(statusCat==="confirmed") ws.confirmed++;
+          else if(statusCat==="overkill") ws.overkill++;
+          else if(statusCat==="unmatched") ws.unmatched++;
+          else ws.other++;
+
+          processedImgs++;
+        }
+        processedFiles++;
+      }
+
+      setStatus("zipStatus", `完成：已處理 ${processedFiles} 個 zip、共 ${processedImgs} 張照片。`, "ok");
+      pendingZipFiles = [];
+      el("zipInput").value = "";
+      renderResults();
+      saveHistory();
+    }catch(e){
+      console.error(e);
+      setStatus("zipStatus", "比對過程發生錯誤：" + e.message, "err");
+    }finally{
+      updateProcessBtn();
+    }
+  });
+
+  // ---------- render results ----------
+  function renderResults(){
+    el("resultsPanel").style.display = "block";
+
+    const total = matched.length;
+    const confirmed = matched.filter(m=>m.status==="confirmed").length;
+    const overkill = matched.filter(m=>m.status==="overkill").length;
+    const unmatched = matched.filter(m=>m.status==="unmatched" || m.status==="other").length;
+
+    el("statGrid").innerHTML = `
+      <div class="stat-card total"><div class="n">${total}</div><div class="l">照片總數</div></div>
+      <div class="stat-card confirmed"><div class="n">${confirmed}</div><div class="l">Confirmed（真缺陷）</div></div>
+      <div class="stat-card overkill"><div class="n">${overkill}</div><div class="l">Overkill Suspected（誤殺）</div></div>
+      <div class="stat-card unmatched"><div class="n">${unmatched}</div><div class="l">未匹配 / 無法對應</div></div>
+    `;
+
+    const c22 = matched.filter(m=>m.classCode==="22").length;
+    const c23 = matched.filter(m=>m.classCode==="23").length;
+    const others = matched.filter(m=>m.classCode && m.classCode!=="22" && m.classCode!=="23").length;
+    el("classBadges").innerHTML = `
+      <span class="badge">代碼22（未定義，無參考價值）：${c22}</span>
+      <span class="badge">代碼23（Polymer Damage，有參考價值）：${c23}</span>
+      ${others ? `<span class="badge">其他代碼：${others}</span>` : ""}
+    `;
+
+    const rows = [...waferStats.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    el("waferTableBody").innerHTML = rows.map(([wafer, s]) => `
+      <tr>
+        <td>${wafer}</td>
+        <td class="num" style="color:var(--red)">${s.confirmed}</td>
+        <td class="num" style="color:var(--teal)">${s.overkill}</td>
+        <td class="num" style="color:var(--amber)">${s.unmatched + s.other}</td>
+        <td class="num">${s.confirmed + s.overkill + s.unmatched + s.other}</td>
+      </tr>
+    `).join("");
+  }
+
+  // ---------- export classified zip ----------
+  el("exportBtn").addEventListener("click", async () => {
+    if(matched.length===0) return;
+    setStatus("exportStatus", "打包中，請稍候（照片數量多時可能需要一些時間）...");
+    try{
+      const out = new JSZip();
+      const folders = {
+        confirmed: out.folder("Confirmed"),
+        overkill: out.folder("Overkill_Suspected"),
+        unmatched: out.folder("Unmatched")
+      };
+
+      const manifestRows = [["wafer","xyz","status","class_code","class_name","roughbin","area_um2","exported_filename"]];
+
+      let n = 0;
+      for(const m of matched){
+        const folder = m.status === "confirmed" ? folders.confirmed
+                      : m.status === "overkill" ? folders.overkill
+                      : folders.unmatched;
+        const clsTag = m.classCode ? `_cls${m.classCode}` : "";
+        const fname = `${m.wafer}_${m.xyz}${clsTag}.jpg`;
+        const blob = await m.zipEntry.async("blob");
+        folder.file(fname, blob);
+        manifestRows.push([m.wafer, m.xyz, m.status, m.classCode, m.className, m.roughbin, m.area, `${m.status}/${fname}`]);
+        n++;
+        if(n % 200 === 0) setStatus("exportStatus", `打包中... (${n}/${matched.length})`);
+      }
+
+      const manifestCsv = manifestRows.map(r => r.map(v => {
+        const s = String(v ?? "");
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+      }).join(",")).join("\n");
+      out.file("manifest.csv", "\uFEFF" + manifestCsv);
+
+      const blob = await out.generateAsync({type:"blob", compression:"DEFLATE", compressionOptions:{level:6}});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const ts = new Date().toISOString().replace(/[:T]/g,"-").slice(0,19);
+      a.href = url;
+      a.download = `AOI_classified_dataset_${ts}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      setStatus("exportStatus", `匯出完成：共 ${matched.length} 張照片（Confirmed / Overkill_Suspected / Unmatched 三個資料夾 + manifest.csv）。`, "ok");
+    }catch(e){
+      console.error(e);
+      setStatus("exportStatus", "匯出失敗：" + e.message, "err");
+    }
+  });
+
+  el("clearSessionBtn").addEventListener("click", () => {
+    matched = [];
+    waferStats = new Map();
+    el("resultsPanel").style.display = "none";
+    setStatus("zipStatus", "已清除本次比對結果，請重新上傳 zip。");
+  });
+
+  // ---------- history (persistent, this browser only) ----------
+  async function saveHistory(){
+    try{
+      for(const [wafer, s] of waferStats.entries()){
+        const key = `history:${wafer}`;
+        const record = {
+          lot: s.lot, wafer,
+          confirmed: s.confirmed, overkill: s.overkill,
+          unmatched: s.unmatched + s.other,
+          updatedAt: new Date().toISOString()
+        };
+        await window.storage.set(key, JSON.stringify(record), false);
+      }
+      await renderHistory();
+    }catch(e){
+      console.error("history save failed", e);
+    }
+  }
+
+  async function renderHistory(){
+    const body = el("historyTableBody");
+    try{
+      const listResult = await window.storage.list("history:", false);
+      const keys = (listResult && listResult.keys) || [];
+      if(keys.length === 0){
+        body.innerHTML = `<tr><td colspan="5" style="color:var(--ink-dim);">尚無歷史紀錄，處理完第一批資料後會自動出現在這裡。</td></tr>`;
+        el("historyTotals").innerHTML = "";
+        return;
+      }
+      const records = [];
+      for(const k of keys){
+        try{
+          const res = await window.storage.get(k, false);
+          if(res && res.value) records.push(JSON.parse(res.value));
+        }catch(err){ /* skip missing */ }
+      }
+      records.sort((a,b) => a.wafer.localeCompare(b.wafer));
+
+      body.innerHTML = records.map(r => `
+        <tr>
+          <td>${r.lot||""}</td>
+          <td>${r.wafer}</td>
+          <td class="num" style="color:var(--red)">${r.confirmed}</td>
+          <td class="num" style="color:var(--teal)">${r.overkill}</td>
+          <td style="color:var(--ink-dim);font-family:var(--mono);font-size:11.5px;">${(r.updatedAt||"").replace("T"," ").slice(0,19)}</td>
+        </tr>
+      `).join("");
+
+      const totalConfirmed = records.reduce((s,r)=>s+(r.confirmed||0),0);
+      const totalOverkill = records.reduce((s,r)=>s+(r.overkill||0),0);
+      const lots = new Set(records.map(r=>r.lot)).size;
+      const wafers = records.length;
+      el("historyTotals").innerHTML = `
+        <div class="stat-card total"><div class="n">${lots}</div><div class="l">累計批號(lot)</div></div>
+        <div class="stat-card total"><div class="n">${wafers}</div><div class="l">累計 wafer 片數</div></div>
+        <div class="stat-card confirmed"><div class="n">${totalConfirmed}</div><div class="l">累計 Confirmed</div></div>
+        <div class="stat-card overkill"><div class="n">${totalOverkill}</div><div class="l">累計 Overkill</div></div>
+      `;
+    }catch(e){
+      console.error(e);
+      body.innerHTML = `<tr><td colspan="5" style="color:var(--red);">歷史紀錄載入失敗</td></tr>`;
+    }
+  }
+
+  el("clearHistoryBtn").addEventListener("click", async () => {
+    if(!confirm("確定要清除所有累計歷史統計嗎？此動作無法復原（不影響已下載的 zip 檔案）。")) return;
+    try{
+      const listResult = await window.storage.list("history:", false);
+      const keys = (listResult && listResult.keys) || [];
+      for(const k of keys){
+        await window.storage.delete(k, false);
+      }
+      setStatus("historyStatus", "歷史紀錄已清除。", "ok");
+      renderHistory();
+    }catch(e){
+      console.error(e);
+      setStatus("historyStatus", "清除失敗：" + e.message, "err");
+    }
+  });
+
+  // init
+  renderHistory();
+})();
+</script>
+</body>
+</html>
