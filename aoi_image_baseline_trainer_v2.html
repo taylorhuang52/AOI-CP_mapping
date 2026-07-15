@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOI 圖片分類模型 Baseline 訓練工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- 需要網路連線載入以下函式庫（JSZip 解壓縮 / TensorFlow.js / MobileNet 預訓練特徵擷取模型） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
+
+<style>
+  :root{
+    --bg:#0f1416;
+    --panel:#161d20;
+    --panel-border:#263135;
+    --text:#dce4e6;
+    --text-dim:#8ba0a6;
+    --accent:#4fb6a8;
+    --accent-dim:#2c6b62;
+    --warn:#d99a4f;
+    --danger:#d9704f;
+    --mono:'IBM Plex Mono', monospace;
+    --sans:'IBM Plex Sans', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans); line-height:1.6; padding:32px 20px 80px;
+  }
+  .wrap{max-width:920px; margin:0 auto;}
+  h1{font-size:22px; font-weight:700; margin:0 0 4px;}
+  .sub{color:var(--text-dim); font-size:14px; margin:0 0 28px;}
+  .card{
+    background:var(--panel); border:1px solid var(--panel-border);
+    border-radius:10px; padding:20px 22px; margin-bottom:18px;
+  }
+  .card h2{
+    font-size:14px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--accent); margin:0 0 14px; font-weight:600;
+  }
+  .step-num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:20px; height:20px; border-radius:50%; background:var(--accent-dim);
+    color:#dff5f0; font-family:var(--mono); font-size:11px; margin-right:8px;
+  }
+  p{margin:0 0 10px; font-size:14px;}
+  ul{margin:6px 0 10px 18px; font-size:14px; color:var(--text-dim);}
+  li{margin-bottom:4px;}
+  input[type=file]{
+    font-family:var(--sans); color:var(--text); font-size:13px;
+    background:#0c1113; border:1px dashed var(--panel-border); border-radius:8px;
+    padding:12px; width:100%;
+  }
+  button{
+    font-family:var(--sans); font-weight:600; font-size:14px;
+    background:var(--accent); color:#08211d; border:none; border-radius:8px;
+    padding:10px 20px; cursor:pointer; margin-top:12px;
+  }
+  button:disabled{background:#2a3538; color:#6b7b7f; cursor:not-allowed;}
+  button.secondary{background:transparent; border:1px solid var(--accent); color:var(--accent);}
+  #progressOuter{
+    height:8px; background:#0c1113; border-radius:4px; overflow:hidden; margin-top:14px;
+  }
+  #progressBar{height:100%; width:0%; background:var(--accent); transition:width .2s;}
+  #progressText{font-family:var(--mono); font-size:12px; color:var(--text-dim); margin-top:6px;}
+  #log{
+    background:#0a0e10; border:1px solid var(--panel-border); border-radius:8px;
+    padding:12px 14px; font-family:var(--mono); font-size:12px; color:#9fd6cc;
+    height:220px; overflow-y:auto; white-space:pre-wrap;
+  }
+  table.resultsTable{width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;}
+  table.resultsTable th, table.resultsTable td{
+    border:1px solid var(--panel-border); padding:8px 10px; text-align:left;
+  }
+  table.resultsTable th{background:#111a1c; color:var(--accent); font-weight:600;}
+  table.resultsTable td.num{font-family:var(--mono);}
+  .note{
+    font-size:12.5px; color:var(--warn); background:#2a2114; border:1px solid #4a3a1e;
+    padding:10px 12px; border-radius:8px; margin-top:10px;
+  }
+  code{background:#0c1113; padding:1px 5px; border-radius:4px; font-family:var(--mono); font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>AOI 圖片分類模型 Baseline 訓練工具</h1>
+  <p class="sub">上傳 AOI-CP 對應分析工具匯出的分類資料集 zip，在瀏覽器本機端用 MobileNet 抽取照片特徵，訓練並驗證 overkill / confirmed 二元分類模型，全程不上傳任何照片到伺服器。</p>
+
+  <div class="card">
+    <h2><span class="step-num">1</span>上傳資料集 zip</h2>
+    <p>選擇 <code>AOI_classified_dataset_*.zip</code>（需包含 <code>manifest.csv</code> 以及 Confirmed / Overkill_Suspected 資料夾內的照片）。</p>
+    <input type="file" id="fileInput" accept=".zip">
+    <div style="margin-top:14px;">
+      <button id="startBtn" disabled>開始擷取特徵並訓練</button>
+    </div>
+    <div id="progressOuter"><div id="progressBar"></div></div>
+    <div id="progressText">尚未開始</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-num">2</span>執行紀錄</h2>
+    <div id="log">等待上傳 zip 檔案...\n</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-num">3</span>結果</h2>
+    <div id="resultsArea"><p style="color:var(--text-dim);">尚無結果，完成訓練後會顯示在這裡。</p></div>
+    <button id="exportBtn" class="secondary" disabled>匯出結果 JSON（給 Claude 分析用）</button>
+    <div class="note">
+      本工具用 MobileNet v2（ImageNet 預訓練）做「凍結特徵擷取」，不是完整 fine-tune，目的是快速驗證圖片視覺特徵是否比純幾何大小（面積/ROUGHBIN）更有分辨力。驗證方式為 GroupKFold（依 wafer 分組，k=6），避免同一片 wafer 同時出現在訓練與驗證集造成資料洩漏。
+    </div>
+  </div>
+
+</div>
+
+<script>
+let zipData = null;
+let manifestRows = [];
+let samples = [];
+let mobilenetModel = null;
+
+const logEl = document.getElementById('log');
+function log(msg){
+  const t = new Date().toLocaleTimeString('zh-TW', {hour12:false});
+  logEl.textContent += `[${t}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function stripBOM(text){
+  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+}
+
+function parseCSV(text){
+  text = stripBOM(text).replace(/\r\n/g, '\n');
+  const lines = text.split('\n').filter(l => l.length > 0);
+  const header = lines[0].split(',').map(h => h.trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++){
+    const parts = lines[i].split(',');
+    const row = {};
+    header.forEach((h, idx) => row[h] = (parts[idx] || '').trim());
+    rows.push(row);
+  }
+  return rows;
+}
+
+function findZipEntry(zip, filenamePath){
+  let entry = zip.file(filenamePath);
+  if (entry) return entry;
+  const base = filenamePath.split('/').pop();
+  const keys = Object.keys(zip.files);
+  const match = keys.find(k => k === base || k.endsWith('/' + base));
+  return match ? zip.file(match) : null;
+}
+
+function loadImage(blob){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = URL.createObjectURL(blob);
+  });
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('startBtn').disabled = true;
+  log(`讀取 zip 檔案: ${file.name}（${(file.size/1024/1024).toFixed(1)} MB）`);
+  try {
+    const zip = await JSZip.loadAsync(file);
+    zipData = zip;
+    let manifestFile = zip.file('manifest.csv');
+    if (!manifestFile){
+      const key = Object.keys(zip.files).find(k => k.toLowerCase().endsWith('manifest.csv'));
+      manifestFile = key ? zip.file(key) : null;
+    }
+    if (!manifestFile){
+      log('錯誤: zip 內找不到 manifest.csv，請確認上傳的是正確的資料集 zip。');
+      return;
+    }
+    const text = await manifestFile.async('string');
+    manifestRows = parseCSV(text);
+    log(`manifest.csv 解析完成，共 ${manifestRows.length} 筆紀錄`);
+    const counts = {};
+    manifestRows.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
+    log(`狀態分布: ${JSON.stringify(counts)}`);
+    document.getElementById('startBtn').disabled = false;
+  } catch (err){
+    log(`讀取 zip 失敗: ${err.message}`);
+  }
+});
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  runPipeline().catch(err => {
+    log(`發生錯誤，流程中斷: ${err.message}`);
+    if (err.stack) log(err.stack);
+    document.getElementById('startBtn').disabled = false;
+  });
+});
+
+async function runPipeline(){
+  document.getElementById('startBtn').disabled = true;
+  samples = [];
+
+  if (!mobilenetModel){
+    log('載入 MobileNet 特徵擷取模型（第一次需要下載模型權重，約 15-20MB）...');
+    mobilenetModel = await mobilenet.load({version: 2, alpha: 1.0});
+    log('MobileNet 載入完成。');
+  }
+
+  const labeledRows = manifestRows.filter(r => r.status === 'confirmed' || r.status === 'overkill');
+  log(`開始擷取照片特徵，共 ${labeledRows.length} 筆已標記照片（unmatched 會略過）...`);
+
+  let processed = 0, failed = 0, fallbackMatched = 0;
+  const progressBar = document.getElementById('progressBar');
+  const progressText = document.getElementById('progressText');
+
+  for (const row of labeledRows){
+    try {
+      const entry = findZipEntry(zipData, row.exported_filename);
+      if (!entry){ failed++; processed++; continue; }
+      if (entry.name !== row.exported_filename) fallbackMatched++;
+
+      const blob = await entry.async('blob');
+      const img = await loadImage(blob);
+      const embeddingTensor = mobilenetModel.infer(img, true);
+      const embeddingArr = await embeddingTensor.data();
+      embeddingTensor.dispose();
+      URL.revokeObjectURL(img.src);
+
+      samples.push({
+        wafer: row.wafer,
+        filename: row.exported_filename,
+        label: row.status === 'confirmed' ? 1 : 0,
+        roughbin: parseFloat(row.roughbin) || 0,
+        area: parseFloat(row.area_um2) || 0,
+        embedding: Array.from(embeddingArr)
+      });
+    } catch (err){
+      failed++;
+    }
+    processed++;
+    if (processed % 20 === 0 || processed === labeledRows.length){
+      const pct = Math.round(processed / labeledRows.length * 100);
+      progressBar.style.width = pct + '%';
+      progressText.textContent = `${processed} / ${labeledRows.length}（失敗 ${failed}）`;
+      await tf.nextFrame();
+    }
+  }
+
+  log(`特徵擷取完成: 成功 ${samples.length} 筆，失敗 ${failed} 筆${fallbackMatched ? `（其中 ${fallbackMatched} 筆是用檔名比對，路徑跟 manifest 記錄不完全一致，建議留意）` : ''}`);
+
+  if (samples.length < 20){
+    log('可用樣本過少，無法進行有意義的訓練，請確認 zip 內容是否正確。');
+    document.getElementById('startBtn').disabled = false;
+    return;
+  }
+
+  await trainAndEvaluate();
+  document.getElementById('startBtn').disabled = false;
+}
+
+function normalizeFeatures(matrix){
+  const nFeat = matrix[0].length;
+  const means = new Array(nFeat).fill(0);
+  const stds = new Array(nFeat).fill(0);
+  matrix.forEach(row => row.forEach((v, j) => means[j] += v));
+  means.forEach((m, j) => means[j] /= matrix.length);
+  matrix.forEach(row => row.forEach((v, j) => stds[j] += (v - means[j]) ** 2));
+  stds.forEach((s, j) => stds[j] = Math.sqrt(s / matrix.length) || 1);
+  return matrix.map(row => row.map((v, j) => (v - means[j]) / stds[j]));
+}
+
+async function runGroupKFoldLogReg(features, labels, foldIdx, K, modelLabel){
+  const n = features.length;
+  const dim = features[0].length;
+  const oof = new Array(n).fill(0);
+
+  for (let f = 0; f < K; f++){
+    log(`  ${modelLabel} - 第 ${f + 1}/${K} 折訓練中...`);
+    const trainIdx = [], testIdx = [];
+    for (let i = 0; i < n; i++) (foldIdx[i] === f ? testIdx : trainIdx).push(i);
+    if (testIdx.length === 0 || trainIdx.length === 0) continue;
+
+    const posIdx = trainIdx.filter(i => labels[i] === 1);
+    const negIdx = trainIdx.filter(i => labels[i] === 0);
+    let balancedIdx = trainIdx.slice();
+    if (posIdx.length > 0 && negIdx.length > 0){
+      const majority = posIdx.length > negIdx.length ? posIdx : negIdx;
+      const minority = posIdx.length > negIdx.length ? negIdx : posIdx;
+      const extra = [];
+      while (minority.length + extra.length < majority.length){
+        extra.push(minority[Math.floor(Math.random() * minority.length)]);
+      }
+      balancedIdx = majority.concat(minority).concat(extra);
+    }
+
+    const xTrain = tf.tensor2d(balancedIdx.map(i => features[i]));
+    const yTrain = tf.tensor2d(balancedIdx.map(i => [labels[i]]));
+    const xTest = tf.tensor2d(testIdx.map(i => features[i]));
+
+    const model = tf.sequential();
+    model.add(tf.layers.dense({units: Math.min(32, dim), activation: 'relu', inputShape: [dim]}));
+    model.add(tf.layers.dropout({rate: 0.2}));
+    model.add(tf.layers.dense({units: 1, activation: 'sigmoid'}));
+    model.compile({optimizer: tf.train.adam(0.005), loss: 'binaryCrossentropy'});
+
+    await model.fit(xTrain, yTrain, {epochs: 20, batchSize: 32, verbose: 0, shuffle: true});
+
+    const predTensor = model.predict(xTest);
+    const predArr = await predTensor.data();
+    testIdx.forEach((idx, j) => oof[idx] = predArr[j]);
+
+    xTrain.dispose(); yTrain.dispose(); xTest.dispose(); predTensor.dispose();
+    model.dispose();
+    log(`  ${modelLabel} - 第 ${f + 1}/${K} 折完成`);
+    await tf.nextFrame();
+  }
+  return oof;
+}
+
+function computeMetrics(labels, scores){
+  const n = labels.length;
+  const paired = labels.map((l, i) => ({l, s: scores[i]})).sort((a, b) => b.s - a.s);
+  const P = labels.reduce((a, b) => a + b, 0);
+  const N = n - P;
+
+  let tp = 0, fp = 0, prevFpr = 0, prevTpr = 0, rocAuc = 0;
+  for (const {l} of paired){
+    if (l === 1) tp++; else fp++;
+    const tpr = P ? tp / P : 0, fpr = N ? fp / N : 0;
+    rocAuc += (fpr - prevFpr) * (tpr + prevTpr) / 2;
+    prevFpr = fpr; prevTpr = tpr;
+  }
+
+  tp = 0; fp = 0;
+  let prevRecall = 0, prAuc = 0;
+  for (const {l} of paired){
+    if (l === 1) tp++; else fp++;
+    const recall = P ? tp / P : 0;
+    const precision = (tp + fp) ? tp / (tp + fp) : 0;
+    prAuc += (recall - prevRecall) * precision;
+    prevRecall = recall;
+  }
+
+  const targets = [0.95, 0.9, 0.8];
+  const opPoints = targets.map(target => {
+    let tp2 = 0, fp2 = 0;
+    let best = {precision: 0, threshold: 1};
+    for (const {l, s} of paired){
+      if (l === 1) tp2++; else fp2++;
+      const recall = P ? tp2 / P : 0;
+      const precision = (tp2 + fp2) ? tp2 / (tp2 + fp2) : 0;
+      if (recall >= target && precision > best.precision) best = {precision, threshold: s};
+    }
+    return {target, ...best};
+  });
+
+  return {rocAuc, prAuc, opPoints, nPositive: P, nNegative: N};
+}
+
+async function trainAndEvaluate(){
+  log('開始 GroupKFold 交叉驗證訓練（依 wafer 分組，k=6）...');
+  const K = 6;
+  const wafers = [...new Set(samples.map(s => s.wafer))].sort();
+  const foldOf = {};
+  wafers.forEach((w, i) => foldOf[w] = i % K);
+
+  const nPos = samples.filter(s => s.label === 1).length;
+  const nNeg = samples.length - nPos;
+  log(`總樣本: ${samples.length}（confirmed: ${nPos}, overkill: ${nNeg}），wafer 數: ${wafers.length}`);
+
+  const tabRaw = samples.map(s => [Math.log(s.area + 1), s.roughbin]);
+  const tabNorm = normalizeFeatures(tabRaw);
+
+  const embRaw = samples.map(s => s.embedding);
+  const embNorm = normalizeFeatures(embRaw);
+
+  const labels = samples.map(s => s.label);
+  const foldIdx = samples.map(s => foldOf[s.wafer]);
+
+  log('訓練表格特徵模型（面積 + ROUGHBIN，作為對照組）...');
+  const tabOOF = await runGroupKFoldLogReg(tabNorm, labels, foldIdx, K, '表格模型');
+  log('訓練圖片特徵模型（MobileNet embedding）...');
+  const embOOF = await runGroupKFoldLogReg(embNorm, labels, foldIdx, K, '圖片模型');
+
+  const tabMetrics = computeMetrics(labels, tabOOF);
+  const embMetrics = computeMetrics(labels, embOOF);
+
+  displayResults(tabMetrics, embMetrics, nPos, nNeg, wafers.length);
+
+  window.__aoiResults = {
+    generatedAt: new Date().toISOString(),
+    kFolds: K,
+    nSamples: samples.length,
+    nConfirmed: nPos,
+    nOverkill: nNeg,
+    nWafers: wafers.length,
+    tabularBaseline: tabMetrics,
+    imageEmbeddingModel: embMetrics,
+    perSample: samples.map((s, i) => ({
+      wafer: s.wafer, filename: s.filename, label: s.label,
+      tabularScore: tabOOF[i], imageScore: embOOF[i]
+    }))
+  };
+  document.getElementById('exportBtn').disabled = false;
+  log('全部完成！可以按下方按鈕匯出結果 JSON。');
+}
+
+function displayResults(tab, emb, nPos, nNeg, nWafers){
+  const el = document.getElementById('resultsArea');
+  const fmtPrec = (m, i) => m.opPoints[i].precision > 0 ? (m.opPoints[i].precision * 100).toFixed(1) + '%' : '—';
+  el.innerHTML = `
+    <p>樣本數 ${nPos + nNeg}（confirmed: ${nPos}, overkill: ${nNeg}）｜ wafer 數 ${nWafers} ｜ GroupKFold k=6（以下皆為 out-of-fold 預測結果，不是訓練集內的表現）</p>
+    <table class="resultsTable">
+      <tr>
+        <th>模型</th><th>ROC-AUC</th><th>PR-AUC</th>
+        <th>Recall≥0.95 時 Precision</th><th>Recall≥0.9 時 Precision</th><th>Recall≥0.8 時 Precision</th>
+      </tr>
+      <tr>
+        <td>表格特徵（面積 + ROUGHBIN）</td>
+        <td class="num">${tab.rocAuc.toFixed(3)}</td><td class="num">${tab.prAuc.toFixed(3)}</td>
+        <td class="num">${fmtPrec(tab,0)}</td><td class="num">${fmtPrec(tab,1)}</td><td class="num">${fmtPrec(tab,2)}</td>
+      </tr>
+      <tr>
+        <td>MobileNet 圖片特徵</td>
+        <td class="num">${emb.rocAuc.toFixed(3)}</td><td class="num">${emb.prAuc.toFixed(3)}</td>
+        <td class="num">${fmtPrec(emb,0)}</td><td class="num">${fmtPrec(emb,1)}</td><td class="num">${fmtPrec(emb,2)}</td>
+      </tr>
+    </table>
+    <p style="margin-top:12px; color:var(--text-dim); font-size:12.5px;">
+      ROC-AUC 0.5 代表跟隨機猜測沒有差別，越接近 1 代表分辨力越強。「Recall≥X 時 Precision」代表如果要求模型抓到 X 比例的真缺陷（confirmed），還能過濾掉多少比例的誤殺（overkill）。
+    </p>
+  `;
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!window.__aoiResults){ return; }
+  const blob = new Blob([JSON.stringify(window.__aoiResults, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  a.href = url;
+  a.download = `aoi_image_model_results_${ts}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
