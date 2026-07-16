@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AOI-CP 影像 AI 模型評估報告</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1c1f22;
+    --ink-soft:#4a5257;
+    --paper:#faf9f6;
+    --panel:#ffffff;
+    --line:#dcd8d0;
+    --accent:#8a4a3d;
+    --accent-soft:#f2e4de;
+    --good:#2f6b52;
+    --good-soft:#e6f0ea;
+    --bad:#a13d2e;
+    --bad-soft:#f7e6e2;
+    --neutral-soft:#eeece6;
+    --serif:'Source Serif 4', serif;
+    --sans:'IBM Plex Sans', sans-serif;
+    --mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); line-height:1.7; font-size:15.5px;
+  }
+  .page{max-width:880px; margin:0 auto; padding:64px 28px 120px;}
+
+  header.doc-head{margin-bottom:56px; border-bottom:3px solid var(--ink); padding-bottom:28px;}
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--accent); margin-bottom:14px;
+  }
+  h1{font-family:var(--serif); font-weight:700; font-size:34px; line-height:1.25; margin:0 0 14px;}
+  .doc-meta{font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); display:flex; gap:22px; flex-wrap:wrap;}
+
+  h2{
+    font-family:var(--serif); font-weight:700; font-size:23px; margin:56px 0 18px;
+    padding-bottom:10px; border-bottom:1px solid var(--line);
+  }
+  h2 .num{color:var(--accent); font-family:var(--mono); font-weight:600; font-size:16px; margin-right:10px;}
+  h3{font-family:var(--sans); font-weight:600; font-size:16.5px; margin:28px 0 10px; color:var(--ink);}
+  p{margin:0 0 14px;}
+  ul, ol{margin:0 0 14px; padding-left:22px;}
+  li{margin-bottom:6px;}
+  strong{font-weight:600;}
+  code{font-family:var(--mono); background:var(--neutral-soft); padding:1px 6px; border-radius:4px; font-size:13.5px;}
+
+  .callout{
+    border-left:3px solid var(--accent); background:var(--accent-soft);
+    padding:16px 20px; margin:20px 0; border-radius:0 6px 6px 0;
+  }
+  .callout .label{font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--accent); margin-bottom:6px; font-weight:600;}
+
+  .verdict{
+    border-radius:8px; padding:18px 22px; margin:20px 0; font-size:15px;
+  }
+  .verdict.good{background:var(--good-soft); border-left:3px solid var(--good);}
+  .verdict.bad{background:var(--bad-soft); border-left:3px solid var(--bad);}
+  .verdict .label{font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:6px;}
+  .verdict.good .label{color:var(--good);}
+  .verdict.bad .label{color:var(--bad);}
+
+  table{width:100%; border-collapse:collapse; margin:20px 0; font-size:14px;}
+  th, td{padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top;}
+  th{font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft); font-weight:600; border-bottom:2px solid var(--ink);}
+  td.num, th.num{font-family:var(--mono); text-align:right;}
+  tr.highlight td{background:var(--neutral-soft);}
+  .tag{
+    display:inline-block; font-family:var(--mono); font-size:11px; padding:2px 8px;
+    border-radius:10px; font-weight:600;
+  }
+  .tag.chance{background:var(--bad-soft); color:var(--bad);}
+  .tag.verified{background:var(--good-soft); color:var(--good);}
+
+  .timeline{border-left:2px solid var(--line); padding-left:24px; margin:24px 0;}
+  .timeline .step{position:relative; margin-bottom:22px;}
+  .timeline .step::before{
+    content:''; position:absolute; left:-29px; top:5px; width:10px; height:10px;
+    border-radius:50%; background:var(--accent);
+  }
+  .timeline .step .t-title{font-weight:600; margin-bottom:4px;}
+  .timeline .step .t-desc{color:var(--ink-soft); font-size:14px;}
+
+  .formula-box{
+    font-family:var(--mono); font-size:14px; background:var(--ink); color:#f0ede6;
+    padding:16px 20px; border-radius:8px; margin:16px 0; overflow-x:auto;
+  }
+
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:20px 0;}
+  .card{border:1px solid var(--line); border-radius:8px; padding:18px 20px; background:var(--panel);}
+  .card h4{margin:0 0 10px; font-size:14.5px; font-family:var(--sans); font-weight:600;}
+
+  footer{margin-top:70px; padding-top:20px; border-top:1px solid var(--line); font-family:var(--mono); font-size:12px; color:var(--ink-soft);}
+
+  section.glossary{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:8px 28px 24px; margin:32px 0;}
+  .glow-card{
+    background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--good);
+    border-radius:0 8px 8px 0; padding:16px 20px; margin:16px 0;
+  }
+  .glow-card h4{margin:0 0 8px; font-size:15px; font-family:var(--sans); font-weight:600; color:var(--ink);}
+  .glow-card p, .glow-card ul{margin:0 0 8px; font-size:14px; color:var(--ink-soft);}
+  .glow-card ul{padding-left:20px;}
+  .glow-card li{margin-bottom:5px;}
+  .method-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:16px 0 28px;}
+  .method-grid .glow-card{margin:0; border-left:3px solid var(--accent);}
+
+  @media (max-width:640px){
+    .two-col{grid-template-columns:1fr;}
+    .method-grid{grid-template-columns:1fr;}
+    h1{font-size:26px;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="doc-head">
+    <div class="eyebrow">內部技術備忘 · AOI-CP 對應分析專案</div>
+    <h1>AOI 影像 AI 模型：嘗試過程、評估結果與後續方向</h1>
+    <div class="doc-meta">
+      <span>整理日期：2026-07-15</span>
+      <span>資料範圍：12 批 lot · 282 片 wafer · 1902 筆已標記瑕疵</span>
+      <span>狀態：4 種方法皆未達實用門檻</span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="num">00</span>摘要</h2>
+    <p>本專案目標是用 AI 模型，根據 AOI（自動光學檢測）偵測到的瑕疵資訊，預判該顆 die 是否會導致 CP（電性測試）真正 Fail，藉此降低 Overkill（AOI 判異常、但電性其實正常）造成的人工複判負擔。</p>
+    <p>目前已完整測試四種獨立的建模方法（表格幾何特徵、通用 CNN 特徵、手工邊緣紋理特徵、真正 fine-tune 的 CNN），結果一致落在 <strong>ROC-AUC 0.48-0.54</strong> 之間，等同隨機猜測。座標配對邏輯已用原始資料重新驗證為完全正確（100% 符合），排除了「標籤雜訊」這個解釋。</p>
+    <div class="callout">
+      <div class="label">核心結論</div>
+      單靠瑕疵裁切照片本身（不論用什麼特徵擷取方式），目前看起來不足以預測 CP 電性結果。問題比較可能出在「照片沒有告訴模型這個座標壓到了什麼電路結構」，而不是模型或特徵擷取方法不夠好。
+    </div>
+  </section>
+
+  <section class="glossary">
+    <h2><span class="num">·</span>看懂這份報告：幾個關鍵名詞的白話解釋</h2>
+    <p>這份報告會一直出現幾個 AI 術語，先用白話講一次，後面看到就不用再查了。</p>
+
+    <div class="glow-card">
+      <h4>ROC-AUC——「模型排序排得準不準」的分數</h4>
+      <p>想像把所有瑕疵照片混在一起，請模型幫每一張打一個「風險分數」，分數越高代表模型認為越可能是真缺陷。ROC-AUC 在問的是：<strong>如果隨機抽一張真的缺陷（confirmed）跟一張其實正常的（overkill），模型有多常正確地把 confirmed 那張打出比較高的分數？</strong></p>
+      <ul>
+        <li><strong>0.5</strong> = 丟銅板，模型完全沒有分辨能力</li>
+        <li><strong>1.0</strong> = 每次都排對，完美</li>
+        <li>這份報告裡四次結果都在 <strong>0.48-0.54</strong>，等於模型打分數的能力跟丟銅板差不多</li>
+      </ul>
+    </div>
+
+    <div class="glow-card">
+      <h4>Precision / Recall——「抓得準」跟「抓得全」</h4>
+      <p>可以想成機場安檢：</p>
+      <ul>
+        <li><strong>Recall（抓得全）</strong>：所有真正的危險物品裡，有幾成被安檢攔下來了？如果 100 個危險物品只攔到 90 個，Recall 就是 90%。這裡對應「真缺陷（confirmed）有沒有被模型抓出來」——這是安全底線，通常希望非常高（95% 以上）</li>
+        <li><strong>Precision（抓得準）</strong>：安檢攔下來的人裡面，有幾成真的帶了危險物品？如果攔了 100 人只有 20 人真的有問題，Precision 就是 20%，代表大部分被攔下的人都是被冤枉的。這裡對應「模型說是缺陷的案例裡，有幾成真的是缺陷」</li>
+      </ul>
+      <p>你們的目標是：在 Recall 維持很高（幾乎不漏抓真缺陷）的前提下，Precision 能不能也拉高——這樣才能真正減少人工複判的工作量，而不是「什麼都攔下來」。</p>
+    </div>
+
+    <div class="glow-card">
+      <h4>PR-AUC——不平衡資料時比 ROC-AUC 更誠實的分數</h4>
+      <p>你們的資料裡，真缺陷（confirmed）只佔約 22%，其餘 78% 都是正常（overkill）。這種「一種類別特別少」的情況下，ROC-AUC 有時候會顯得比實際情況樂觀。PR-AUC 專門針對這種不平衡資料設計，數字比較不會被「大多數都是正常」這件事灌水，是這份報告裡更保守、更值得信任的一個對照指標。</p>
+    </div>
+
+    <div class="glow-card">
+      <h4>為什麼要「依 wafer 分組」驗證（GroupKFold）？</h4>
+      <p>如果隨便把 1902 張照片打散，隨機抓 80% 當訓練、20% 當驗證，很可能同一片 wafer 的照片同時出現在兩邊——這就像考試時，你不是真的會寫題目，而是背了「隔壁同學跟你抄同一份筆記」的答案，會讓分數看起來很好、但其實沒有真本事。「依 wafer 分組」保證同一片 wafer 的照片只會出現在其中一邊，逼模型去預測「它完全沒看過的一片新 wafer」，這樣算出來的分數才反映真實能力。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">01</span>背景與目標</h2>
+    <p>AOI 機台用光學閾值判斷瑕疵，會產生大量 Overkill。過去對 RP69675 批號 12 片 wafer 的驗證顯示，AOI 標記的異常中，約 <strong>90% 屬於 Overkill</strong>（CP 測試實際正常），只有約 10% 是真正會導致電性失效的缺陷（Confirmed）。這個比例後續在更大規模的資料上大致維持（12 批合計 422 顆 confirmed / 1902 筆，約 22% confirmed）。</p>
+    <p>目標：訓練一個模型，讓 AOI 站別能自動判斷「這顆 AOI 標記的瑕疵，會不會真的讓 CP Fail」，藉此讓大部分明顯是 Overkill 的案例直接放行，只把不確定的案例留給人工複判。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>資料管線與規模演進</h2>
+    <p>資料來源固定為兩種原始檔案：AOI 端的 <code>.kla</code>（KLARF 精確瑕疵記錄，含 XINDEX/YINDEX/尺寸/分類代碼）與簡化版 <code>.csv</code>（wafer map 網格），搭配 CP 端的 <code>.csv</code>（每顆 die 的 Bin 結果，非 Bin1 皆為 Fail）。</p>
+    <div class="timeline">
+      <div class="step">
+        <div class="t-title">第一階段：36 顆 confirmed（12 片 wafer）</div>
+        <div class="t-desc">初步驗證資料格式與 Overkill 率，確認約 90% Overkill。</div>
+      </div>
+      <div class="step">
+        <div class="t-title">第二階段：224 張實際照片（2 批 lot）</div>
+        <div class="t-desc">建立「依標籤匯出照片」工具，把統計數字實體化成可訓練的圖片資料集，並發現多筆瑕疵共用同一顆 die 座標時可用「die 級標籤繼承」補齊漏標的照片。</div>
+      </div>
+      <div class="step">
+        <div class="t-title">第三階段：1902 筆（12 批 lot，422 顆 confirmed）</div>
+        <div class="t-desc">樣本量正式超過「圖片模型 fine-tune」門檻（原訂 300+），開始進行完整的圖片模型評估。</div>
+      </div>
+    </div>
+
+    <h3>座標轉換公式（已用原始資料驗證，可放心使用）</h3>
+    <div class="formula-box">CP_XAdr = AOI_XINDEX + 6<br>CP_YAdr = AOI_YINDEX + 7&nbsp;&nbsp;（用 .kla 原始 YINDEX 時，須另外做 Y 軸反轉：YAdr = (ROWCT−1−YINDEX) + 7）</div>
+    <p>早期「Y 軸反向該不該打勾」的矛盾已徹底查清：簡化版 CSV 檔案的行儲存順序，本身就跟 .kla 的 YINDEX 方向相反。只要不對簡化 CSV 的行號再做一次反轉，兩次方向差異剛好抵銷，答案就是對的。用 <strong>25 片 wafer、199 筆有 CP 對照的瑕疵逐一核對，符合率 100%</strong>，證實現有的 AOI-CP 分析工具與匯出的標籤資料是可信的。</p>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>嘗試過的建模方法與結果</h2>
+    <p>以下全部使用 <strong>GroupKFold（依 wafer 分組）</strong>驗證，避免同一片 wafer 的資料同時出現在訓練與驗證集造成資料洩漏。</p>
+
+    <table>
+      <thead>
+        <tr><th>方法</th><th>特徵來源</th><th class="num">ROC-AUC</th><th class="num">PR-AUC</th><th>結果判讀</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>表格幾何特徵</td>
+          <td>面積、ROUGHBIN、座標位置</td>
+          <td class="num">0.51 ~ 0.53</td>
+          <td class="num">0.23</td>
+          <td><span class="tag chance">接近隨機</span> confirmed/overkill 兩組的面積、位置中位數幾乎相同</td>
+        </tr>
+        <tr>
+          <td>MobileNet 凍結 embedding</td>
+          <td>ImageNet 預訓練通用特徵</td>
+          <td class="num">0.478</td>
+          <td class="num">0.218</td>
+          <td><span class="tag chance">接近隨機</span> 通用特徵跟灰階顆粒紋理域差距太大</td>
+        </tr>
+        <tr>
+          <td>HOG + Random Forest</td>
+          <td>手工邊緣方向統計特徵</td>
+          <td class="num">0.538</td>
+          <td class="num">0.234</td>
+          <td><span class="tag chance">接近隨機</span> 統計式邊緣特徵抓不到空間關係</td>
+        </tr>
+        <tr class="highlight">
+          <td>ResNet18 Fine-tune</td>
+          <td>解凍 layer3+ 之後，真正訓練</td>
+          <td class="num">0.506</td>
+          <td class="num">0.206</td>
+          <td><span class="tag chance">接近隨機</span> 專門設計來學空間關係的方法，結果仍相同</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>這四種方法到底在做什麼？（白話版）</h3>
+    <div class="method-grid">
+      <div class="glow-card">
+        <h4>① 表格幾何特徵</h4>
+        <p>完全不看照片，只用 AOI 量到的幾個數字——瑕疵多大、形狀粗細分類、在 wafer 上的位置。好比只憑「這顆蘋果重幾克、屬於大中小哪一類」去判斷蘋果甜不甜，完全沒有真的咬一口看看。結果顯示，光憑這些數字，猜甜不甜的準確率跟亂猜差不多。</p>
+      </div>
+      <div class="glow-card">
+        <h4>② MobileNet 凍結 embedding</h4>
+        <p>MobileNet 是一個已經看過幾百萬張日常照片（貓、狗、家具、食物）訓練出來的 AI，我們直接借用它「看照片」的方式，不重新教它。問題是，它一輩子沒看過灰階顆粒狀的顯微鏡瑕疵照片——好比找一個很會分辨貓狗品種的人，來判斷一張醫學超音波影像，他的專業經驗完全用不上。</p>
+      </div>
+      <div class="glow-card">
+        <h4>③ HOG + Random Forest</h4>
+        <p>HOG 是一種老派但常用的做法：把照片切成一格一格的小方塊，統計每一格裡「線條大概朝哪個方向」。好比不去看整幅畫在畫什麼，只統計畫布上每一小塊筆觸的方向分布。這種方式可以抓到粗略的紋理，但抓不到「這條線跟旁邊那個結構是什麼關係」這種比較高層次的空間概念。</p>
+      </div>
+      <div class="glow-card">
+        <h4>④ ResNet18 Fine-tune</h4>
+        <p>ResNet18 也是一個看過大量日常照片的 AI，但這次不是直接借用，而是<strong>真的拿我們自己的 1902 張照片去重新訓練它</strong>（解凍它後半段的判斷邏輯，讓它自己調整），目的是讓它學會辨認我們這批照片專屬的規律，而不是套用它原本學到的貓狗知識。這是四種方法裡「最認真」的一種，結果卻跟其他三種一樣，這也是為什麼報告認為問題出在資料本身，而不是方法不夠努力。</p>
+      </div>
+    </div>
+
+    <h3>人工視覺抽查</h3>
+    <p>從 confirmed / overkill 各抽 14 張、涵蓋 5 個不同 lot 交叉比對，肉眼盲測下無法穩定分辨兩組差異——最早促成這個專案方向的兩張範例照片（<code>14_25_10.jpg</code> vs <code>8_24_9.jpg</code>）呈現的「壓在 bump/pad 上」對比，在更大樣本下沒有一致重現，比較像是特例而非普遍規律。</p>
+
+    <div class="verdict bad">
+      <div class="label">四個獨立方法、一個一致結論</div>
+      表格數字、通用 CNN 特徵、手工邊緣特徵、真正 fine-tune 的 CNN——四種完全不同的技術路線都落在同一個「接近隨機」的水準。這不太可能是巧合，代表問題可能出在資料本身能提供的資訊量，而不是任何一種方法的技術細節。
+    </div>
+    <div class="verdict good">
+      <div class="label">但排除了一個容易誤判的可能性</div>
+      座標配對邏輯已用原始 .kla + CP 資料重新驗證，100% 正確。標籤本身沒有系統性錯位的問題，四次「接近隨機」的結果反映的是真實訊號不足，不是資料髒污造成的假陰性。
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>為什麼會這樣：可能的根本原因</h2>
+    <div class="two-col">
+      <div class="card">
+        <h4>瑕疵裁切照片缺乏「語意」資訊</h4>
+        <p>500×500 的裁切照片只能顯示瑕疵周邊有沒有可見的圖案（線條、bump 排列），但看不出那個圖案在電路設計上是否為關鍵路徑。同樣「瑕疵旁邊有結構」，可能一個是訊號腳位、一個只是裝飾性金屬層，照片本身無法區分。</p>
+      </div>
+      <div class="card">
+        <h4>ClassNumber 幾乎全數未分類</h4>
+        <p>約 96% 的瑕疵代碼為 <code>22</code>，且這個代碼在機台自己的 <code>ClassLookup</code> 定義表裡根本不存在——代表 AOI 的自動分類（ADC）功能實質上沒有在運作，等於少了「這是什麼種類的瑕疵」這個關鍵資訊來源。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>後續可改進的方向</h2>
+
+    <h3>方向一：解決 ClassNumber 22 的分類問題（建議優先）</h3>
+    <p>這是目前資料裡最大的「資訊缺口」，而且是站別設定問題，不是演算法問題：</p>
+    <ul>
+      <li>跟 AOI 站別工程師確認機台的 ADC（自動缺陷分類）功能是否有正確啟用、訓練過的分類模型是否過時或從未建立</li>
+      <li>如果機台廠牌支援，重新建立或校正 ADC 的分類規則庫（class library），讓瑕疵能被分到 Die Crack、Bump Bridge、Particle 等有意義的類別，而不是全部落在未定義的 <code>22</code></li>
+      <li>即使無法馬上做到細分類，退而求其次也可以考慮讓機台或後製流程標出粗略的形狀/紋理分群（例如用非監督式分群先把 22 代碼底下的瑕疵分成幾種視覺上明顯不同的子群），作為過渡方案</li>
+    </ul>
+
+    <h3>方向二：疊加 Layout / GDS 電路結構資訊</h3>
+    <p>目前最大的假設是：真正決定 CP 是否 Fail 的關鍵，是「這個座標是否落在 bump/pad/訊號線這類關鍵結構上」，而這件事表格數字與瑕疵裁切照片都沒有直接捕捉到。如果能取得：</p>
+    <ul>
+      <li>晶片 layout 或 GDS 檔案，疊加到 AOI 座標上，標出每個瑕疵位置是否落在關鍵結構（哪怕只是二元標記：關鍵 / 非關鍵）</li>
+      <li>把這個「是否壓到關鍵結構」的標記，當作額外的表格特徵餵給模型，或作為圖片模型的第二個輸入通道（跟裁切照片疊加成雙通道輸入）</li>
+    </ul>
+    <p>這條路線的技術可行性取決於是否能取得 layout 資料、以及座標系統要再做一次跟 layout 圖資的對應校正，工作量不小，但目前證據顯示這可能是唯一有機會突破現有天花板的方向。</p>
+
+    <h3>方向三：持續累積樣本，但要調整優先順序</h3>
+    <ul>
+      <li>continue 收集 confirmed 樣本沒有壞處，但**不用再期待「純靠更多同類型資料」能讓現有四種方法翻盤**——目前的失敗看起來不是樣本不足造成的</li>
+      <li>如果要收集，優先收集「同一顆 die 上有多個瑕疵、且已知哪一個是真正責任瑕疵」的案例（例如透過人工複判標出 root cause defect），這能解決本文件開頭提到的「confirmed die 上多瑕疵無法歸因」的標籤雜訊問題</li>
+    </ul>
+
+    <h3>方向四：維持分級複判架構的長期規劃</h3>
+    <p>即使圖片/表格模型目前效果有限，先前規劃的分級複判架構仍然是合理的長期方向：高信心 pass/fail 自動判定、中間信心區間交人工複判，人工複判結果回饋成新的訓練資料（active learning）。這個架構不依賴單一模型突破 70% 準確率才能上線，可以先用現有模型（即使準確率有限）建立信心區間，未來模型進步時直接套用同一套架構。</p>
+
+    <h3>資料品質待辦</h3>
+    <ul>
+      <li>已知風險：同一顆 confirmed die 上的多個瑕疵，目前全部沿用同一個標籤，但只有其中可能一個是真正的責任瑕疵——短期不影響現有評估結論，長期若要精修模型，值得回頭處理</li>
+      <li>座標轉換公式與「Y 軸反向」設定的正確原因已完整記錄於本文件第 2 節，避免未來重新出現同樣的困惑</li>
+    </ul>
+  </section>
+
+  <footer>
+    本文件整理自 AOI-CP 對應分析專案的多輪模型驗證紀錄，供內部參考與後續規劃使用。
+  </footer>
+
+</div>
+</body>
+</html>
